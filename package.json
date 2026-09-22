@@ -1,0 +1,60 @@
+{
+  "name": "lantern-remote",
+  "productName": "Lantern Remote",
+  "version": "0.1.0",
+  "description": "Open-source remote desktop application (Electron + WebRTC + Socket.IO). Portfolio project inspired by the architecture of remote-desktop tools.",
+  "main": ".vite/build/main.js",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "publish": "electron-forge publish",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint --ext .ts,.tsx electron src server",
+    "lint:fix": "eslint --ext .ts,.tsx electron src server --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,json,css,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,css,md}\"",
+    "test": "echo \"No tests yet (Phase 11).\" && exit 0"
+  },
+  "keywords": [
+    "electron",
+    "webrtc",
+    "remote-desktop",
+    "typescript",
+    "react"
+  ],
+  "author": "Lantern Remote Contributors",
+  "license": "MIT",
+  "dependencies": {
+    "electron-squirrel-startup": "^1.0.1",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "zustand": "^5.0.6"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.11.2",
+    "@electron-forge/maker-deb": "^7.11.2",
+    "@electron-forge/maker-rpm": "^7.11.2",
+    "@electron-forge/maker-squirrel": "^7.11.2",
+    "@electron-forge/maker-zip": "^7.11.2",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.11.2",
+    "@electron-forge/plugin-fuses": "^7.11.2",
+    "@electron-forge/plugin-vite": "^7.11.2",
+    "@electron/fuses": "^1.8.0",
+    "@types/electron-squirrel-startup": "^1.0.2",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.6",
+    "@typescript-eslint/eslint-plugin": "^8.39.0",
+    "@typescript-eslint/parser": "^8.39.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "electron": "44.4.3",
+    "eslint": "^8.57.1",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "prettier": "^3.6.2",
+    "typescript": "~5.9.2",
+    "vite": "^5.4.21"
+  }
+}
