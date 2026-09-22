@@ -38,7 +38,10 @@ export function DeviceIdCard() {
         </button>
         <span className="pill pill-ready">Ready</span>
       </div>
-      <p className="hint">Share this ID plus a temporary password (Phase 8) to allow access.</p>
+      <p className="hint">
+        This ID is stable on this machine. Share it plus a temporary password (Phase 8) to allow
+        access.
+      </p>
     </section>
   );
 }

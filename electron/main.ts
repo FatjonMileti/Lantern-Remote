@@ -12,21 +12,31 @@ if (started) {
   app.quit();
 }
 
+const customUserData = process.env.LANTERN_USER_DATA;
+if (customUserData) {
+  app.setPath('userData', customUserData);
+}
+
 const deviceIdentity = new DeviceIdentityService();
 
 registerIpcHandlers(deviceIdentity);
 
-const gotLock = app.requestSingleInstanceLock();
+const allowMultiInstance =
+  process.env.LANTERN_ALLOW_MULTI_INSTANCE === '1' || Boolean(customUserData);
+
+const gotLock = allowMultiInstance ? true : app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
-    const win = BrowserWindow.getAllWindows()[0];
-    if (win) {
-      if (win.isMinimized()) win.restore();
-      win.focus();
-    }
-  });
+  if (!allowMultiInstance) {
+    app.on('second-instance', () => {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win) {
+        if (win.isMinimized()) win.restore();
+        win.focus();
+      }
+    });
+  }
 
   void app.whenReady().then(() => {
     createMainWindow();

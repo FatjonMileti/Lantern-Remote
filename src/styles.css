@@ -93,6 +93,35 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.button-secondary {
+  background: transparent;
+  color: var(--text);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 10, 16, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.4rem;
+  max-width: 420px;
+  width: calc(100% - 2rem);
+}
+
+.modal h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
 .pill {
   display: inline-block;
   padding: 0.2rem 0.65rem;

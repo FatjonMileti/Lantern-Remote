@@ -24,6 +24,8 @@
 ## Identity vs. authentication
 
 - The 9-digit device ID (`482 913 742` format) is an **identifier, not a secret**.
+- It is generated with `crypto.randomInt` and persisted under `userData`
+  (never a MAC address or other hardware identifier).
 - Phase 8 adds: cryptographically random temporary password
   (`crypto.randomInt`, never `Math.random`), expiry, plus host approval.
 - Future production deployments should add authenticated device registration

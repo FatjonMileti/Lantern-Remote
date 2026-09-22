@@ -5,9 +5,9 @@ A portfolio-quality project demonstrating real-time communication, desktop captu
 and secure Electron architecture. Inspired by the _architecture_ of tools like
 AnyDesk/TeamViewer — no branding, proprietary UI, or code is copied.
 
-> **Phase 1 status:** Electron Forge + Vite + React + TypeScript scaffold with a
-> secure IPC bridge and placeholder UI. Signaling (Phase 2), WebRTC (Phase 3),
-> screen capture (Phase 4), and remote input (Phases 6–7) are not yet implemented.
+> **Phase 2 status:** Socket.IO signaling server, persisted device IDs, and
+> Connect → incoming Accept/Reject are implemented. WebRTC (Phase 3), screen
+> capture (Phase 4), and remote input (Phases 6–7) are not yet implemented.
 
 ## Architecture
 
@@ -25,13 +25,18 @@ flowchart TB
 
   CR <-->|typed IPC| CP
   HR <-->|typed IPC| HP
-  CP <-->|Socket.IO signaling only| SIG
-  HP <-->|Socket.IO signaling only| SIG
+  CR <-->|Socket.IO signaling only| SIG
+  HR <-->|Socket.IO signaling only| SIG
   CR <==>|WebRTC media + DataChannels| HR
 ```
 
 After signaling, screen video and input flow peer-to-peer over encrypted WebRTC.
 The signaling server never receives screen video.
+
+**Why Socket.IO:** `socket.io` (server) and `socket.io-client` (renderer) provide
+rooms, acknowledgements, and reconnect for presence and connection-request
+routing. They are not used for media. The renderer owns the socket because
+Phase 3 `RTCPeerConnection` also lives in the renderer.
 
 ## Electron process model
 
@@ -42,8 +47,9 @@ The signaling server never receives screen video.
 - `electron/preload.ts` — `contextBridge` exposing only `window.lantern`.
 - `electron/services/` — main-process services (`DeviceIdentityService`, `Logger`).
 - `shared/ipc.ts` — single source of truth for IPC channels and payloads.
-- `src/` — React renderer (components/pages/hooks/stores/services/types/utils).
-- `server/` — Socket.IO signaling server (Phase 2).
+- `shared/signaling.ts` — signaling events, payloads, and validators.
+- `src/` — React renderer (components/pages/hooks/stores/services).
+- `server/` — Socket.IO signaling (device registry, rooms, consent routing).
 
 ## Development
 
@@ -51,10 +57,30 @@ Requirements: Node.js 20+, npm.
 
 ```bash
 npm install
-npm run start    # development
-npm run package  # production package
-npm run make     # distributables
+npm run server   # signaling on http://localhost:3001
+npm run start    # Electron app (another terminal)
 ```
+
+Linux sandbox note: if `npm run start` aborts on `chrome-sandbox` SUID,
+use `ELECTRON_DISABLE_SANDBOX=1 npm run start` (dev machines only).
+
+Two local instances (two device IDs) need separate userData directories:
+
+```bash
+# terminal A
+npm run server
+
+# terminal B (host)
+ELECTRON_DISABLE_SANDBOX=1 npm run start
+
+# terminal C (client) — only after the first app's Vite server is up
+ELECTRON_DISABLE_SANDBOX=1 LANTERN_USER_DATA=/tmp/lantern-client-b \
+  LANTERN_ALLOW_MULTI_INSTANCE=1 npm run start
+```
+
+If the second `npm run start` fails because the Vite port is taken, reuse the
+first renderer URL by launching another Electron process against the already
+running Forge session, still with a distinct `LANTERN_USER_DATA`.
 
 Configuration (see `.env.example`):
 
@@ -71,14 +97,15 @@ See `SECURITY.md`. Key points:
 - Every remote session requires explicit host approval (Accept/Reject).
 - Device ID is an identifier, not a password; Phase 8 adds expiring tokens.
 - WebRTC media/DataChannels are encrypted; signaling carries no video.
+- Device ID is persisted under `app.getPath('userData')`, never a MAC address.
 
-## Known limitations (Phase 1)
+## Known limitations (Phase 2)
 
-- Device ID is ephemeral (persistence lands in Phase 2).
-- Connect button disabled; no signaling/WebRTC/capture/input yet.
+- Connect/Accept/Reject is signaling-only; no SDP/ICE/media yet.
+- Temporary connection tokens arrive in Phase 8.
 - Single main window; no tray, no multi-monitor selection yet.
 
 ## Roadmap
 
-Phases 2–12 per spec: signaling → WebRTC → capture → viewer → mouse →
+Phases 3–12 per spec: WebRTC → capture → viewer → mouse →
 keyboard → auth tokens → clipboard → settings/logging → tests → polish.

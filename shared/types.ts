@@ -13,6 +13,6 @@ export type ConnectionStatus =
   | 'failed';
 
 export interface DeviceInfo {
-  /** Human-readable device id, e.g. "482 913 742". Placeholder until Phase 2. */
+  /** Human-readable device id, e.g. "482 913 742". */
   deviceId: string;
 }

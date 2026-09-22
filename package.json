@@ -8,12 +8,13 @@
   "type": "commonjs",
   "scripts": {
     "start": "electron-forge start",
+    "server": "tsx server/index.ts",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "eslint --ext .ts,.tsx electron src server",
-    "lint:fix": "eslint --ext .ts,.tsx electron src server --fix",
+    "lint": "eslint --ext .ts,.tsx electron src server shared",
+    "lint:fix": "eslint --ext .ts,.tsx electron src server shared --fix",
     "format": "prettier --write \"**/*.{ts,tsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,css,md}\"",
     "test": "echo \"No tests yet (Phase 11).\" && exit 0"
@@ -31,6 +32,8 @@
     "electron-squirrel-startup": "^1.0.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "zustand": "^5.0.6"
   },
   "devDependencies": {
@@ -54,6 +57,7 @@
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "prettier": "^3.6.2",
+    "tsx": "^4.23.15",
     "typescript": "~5.9.2",
     "vite": "^5.4.21"
   }

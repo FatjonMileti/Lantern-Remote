@@ -1,32 +1,49 @@
 # TODO.md — Build Phases for Lantern Remote
 
-Phase 1 (scaffold) is **done**. Implement phases in order; do not skip ahead.
+Phase 1 (scaffold) is **done and pushed** (`feat: initialize electron forge vite application`).
+Phase 2 (signaling) is **implemented in the working tree, not yet committed**.
+Implement phases in order; do not skip ahead.
 After each phase follow the Phase workflow in `AGENTS.md`, then stop and wait.
 
 ---
 
-## Phase 2 — Signaling server + device registration
+## Phase 2 — Signaling server + device registration — DONE (uncommitted)
 
 **Goal:** two app instances discover each other via Socket.IO.
 
-- [ ] Add `socket.io` + `socket.io-client` dependencies; explain why.
-- [ ] Implement `server/`:
-  - `socket/` device registry (`register-device`, presence, disconnect cleanup)
-  - `rooms/` connection rooms (create, join, leave, cleanup)
-  - Route: `connection-request`, `connection-accepted`, `connection-rejected`
-  - Notify: device online/offline, `disconnect-device`
-- [ ] Persist device ID: finish `DeviceIdentityService`
-      (`app.getPath('userData')`, `XXX XXX XXX` format, stable across restarts).
-      No MAC address as public identifier.
-- [ ] Wire renderer: enable Connect button → send `connection-request`;
-      host shows incoming-request UI with Accept/Reject (stub negotiation).
-- [ ] Validate every signaling payload; human-readable errors for
-      server-unavailable, invalid ID, device offline, rejected, timeout.
+- [x] Add `socket.io` + `socket.io-client` dependencies; explain why.
+      (Why documented in `server/index.ts` + README: rooms, acks, reconnect for
+      signaling only — never media. `tsx` added as dev runner for `npm run server`.)
+- [x] Implement `server/`:
+  - [x] `socket/deviceRegistry.ts` — device registry (`register-device`, presence,
+        disconnect cleanup, displaces stale socket on re-register)
+  - [x] `rooms/connectionRooms.ts` — connection rooms (create pending, accept,
+        remove, TTL expiry)
+  - [x] Route: `connection-request`, `connection-accepted`, `connection-rejected`
+        (`server/socket/handlers.ts`, auth checks: registered-only, host-only
+        accept/reject, no self-connect, one session per device)
+  - [x] Notify: device online/offline, `disconnect-device`, `peer-disconnected`
+        (`left`/`offline`/`timeout`/`rejected`), pending-room TTL sweeper
+- [x] Persist device ID: finished `DeviceIdentityService`
+      (`app.getPath('userData')` + `device-identity.json`, atomic write via
+      tmp+rename, `XXX XXX XXX` format, stable across restarts).
+      No MAC address as public identifier. Shared helpers in `shared/deviceId.ts`.
+- [x] Wire renderer: enabled Connect button → sends `connection-request`
+      (`src/services/SignalingService.ts` + `src/hooks/useSignalingSession.ts`);
+      host shows `IncomingRequestModal` with Accept/Reject. Self-connect allowed
+      locally only via `LANTERN_USER_DATA`/`LANTERN_ALLOW_MULTI_INSTANCE` for
+      two-instance testing.
+- [x] Validate every signaling payload (`shared/signaling.ts` parsers);
+      human-readable errors for server-unavailable, invalid ID, device offline,
+      rejected, timeout, self-connect, unauthorized, room-not-found,
+      already-in-session, not-registered.
 
-**Verify:** start server + two app instances; Client enters Host ID → Host sees
+**Verify:** `npm run typecheck` ✅, `npm run lint` ✅ (checked 2026-09-22).
+Still to do manually: `npm run server` + two app instances (see README
+two-instance instructions); Client enters Host ID → Host sees
 "Incoming connection from XXX" with Accept/Reject.
 
-**Commit:** `feat: add signaling server`
+**Commit:** `feat: add signaling server` (pending — 16 modified + 8 new files)
 
 ---
 
