@@ -7,7 +7,7 @@ After each phase follow the Phase workflow in `AGENTS.md`, then stop and wait.
 
 ---
 
-## Phase 2 — Signaling server + device registration — DONE (uncommitted)
+## Phase 2 — Signaling server + device registration — DONE
 
 **Goal:** two app instances discover each other via Socket.IO.
 

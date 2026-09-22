@@ -44,6 +44,24 @@ use `ELECTRON_DISABLE_SANDBOX=1 npm run start` (dev machines only).
 - Comments explain WHY, not what. No giant components.
 - Validate every remote message (signaling + DataChannel). Never trust remote input.
 - Never log passwords, tokens, clipboard contents, or raw input events.
+- Main-process IPC handlers must be safe under concurrent invocation:
+  React StrictMode double-fires renderer boot effects in dev, so two identical
+  IPC calls can arrive simultaneously (previously caused an ENOENT race in
+  device-identity creation). Use single-flight promises and unique tmp files
+  for read-modify-write sequences.
+
+## Local two-instance testing
+
+Two app instances (host + client) need separate profiles. With the first
+instance's Vite server already running:
+
+```bash
+ELECTRON_DISABLE_SANDBOX=1 LANTERN_USER_DATA=/tmp/lantern-client-b \
+  LANTERN_ALLOW_MULTI_INSTANCE=1 npm run start
+```
+
+Use throwaway dirs under `/tmp`; never point `LANTERN_USER_DATA` at the real
+profile (`~/.config/Lantern Remote`).
 
 ## Security invariants
 

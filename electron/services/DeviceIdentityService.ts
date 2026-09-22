@@ -24,14 +24,32 @@ function isStoredIdentity(value: unknown): value is StoredIdentity {
  */
 export class DeviceIdentityService {
   private cachedId: string | null = null;
+  /**
+   * WHY single-flight: React StrictMode double-mounts the boot effect in dev,
+   * firing two concurrent `get-device-id` IPC calls. Without sharing one
+   * in-flight attempt, both would run loadOrCreate() against the same tmp
+   * path and the loser's rename() would fail with ENOENT.
+   */
+  private pending: Promise<string> | null = null;
 
   constructor(private readonly fileName = IDENTITY_FILE) {}
 
   async getDeviceId(): Promise<string> {
     if (this.cachedId) return this.cachedId;
-    const digits = await this.loadOrCreate();
-    this.cachedId = formatDeviceId(digits);
-    return this.cachedId;
+    if (!this.pending) {
+      this.pending = this.loadOrCreate().then(
+        (digits) => {
+          this.cachedId = formatDeviceId(digits);
+          this.pending = null;
+          return this.cachedId;
+        },
+        (error: unknown) => {
+          this.pending = null;
+          throw error;
+        },
+      );
+    }
+    return this.pending;
   }
 
   get userDataPath(): string {
@@ -48,7 +66,9 @@ export class DeviceIdentityService {
     if (existing) return existing;
 
     const digits = generateDigits();
-    const tmp = `${this.filePath}.tmp`;
+    // Unique tmp file per attempt so concurrent writers (or a second process)
+    // can never steal each other's staged file before rename().
+    const tmp = `${this.filePath}.${process.pid}.${randomInt(0, 1_000_000)}.tmp`;
     const body = JSON.stringify({ deviceId: digits }, null, 2);
     await writeFile(tmp, body, 'utf8');
     await rename(tmp, this.filePath);
