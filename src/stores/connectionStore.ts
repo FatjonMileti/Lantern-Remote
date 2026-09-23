@@ -18,6 +18,9 @@ interface ConnectionState {
   role: SessionRole | null;
   rtcState: RTCPeerConnectionState;
   iceState: RTCIceConnectionState;
+  sharing: boolean;
+  localStream: MediaStream | null;
+  remoteStream: MediaStream | null;
   setRemoteId: (id: string) => void;
   setStatus: (status: ConnectionStatus) => void;
   setError: (error: string | null) => void;
@@ -27,6 +30,9 @@ interface ConnectionState {
   setRole: (role: SessionRole | null) => void;
   setRtcState: (state: RTCPeerConnectionState) => void;
   setIceState: (state: RTCIceConnectionState) => void;
+  setSharing: (sharing: boolean) => void;
+  setLocalStream: (stream: MediaStream | null) => void;
+  setRemoteStream: (stream: MediaStream | null) => void;
   reset: () => void;
 }
 
@@ -35,6 +41,7 @@ interface ConnectionState {
  * Phase 2 drives idle → connecting → waiting-for-approval → approved / failed.
  * Phase 3 extends to negotiating → connected / disconnected / failed plus
  * live RTCPeerConnection and ICE states for diagnostics.
+ * Phase 4 adds local/remote MediaStreams and the sharing flag.
  */
 export const useConnectionStore = create<ConnectionState>((set) => ({
   status: 'idle',
@@ -46,6 +53,9 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
   role: null,
   rtcState: 'new',
   iceState: 'new',
+  sharing: false,
+  localStream: null,
+  remoteStream: null,
   setRemoteId: (remoteId) => set({ remoteId }),
   setStatus: (status) => set({ status }),
   setError: (error) => set({ error }),
@@ -55,6 +65,9 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
   setRole: (role) => set({ role }),
   setRtcState: (rtcState) => set({ rtcState }),
   setIceState: (iceState) => set({ iceState }),
+  setSharing: (sharing) => set({ sharing }),
+  setLocalStream: (localStream) => set({ localStream }),
+  setRemoteStream: (remoteStream) => set({ remoteStream }),
   reset: () =>
     set({
       status: 'idle',
@@ -64,5 +77,8 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
       role: null,
       rtcState: 'new',
       iceState: 'new',
+      sharing: false,
+      localStream: null,
+      remoteStream: null,
     }),
 }));

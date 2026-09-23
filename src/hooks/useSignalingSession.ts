@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
+import { parseControlMessage } from '../../shared/controlMessages.js';
 import { formatDeviceId } from '../../shared/deviceId.js';
 import { NEGOTIATION_TIMEOUT_MS, SIGNALING_ERROR_MESSAGES } from '../../shared/signaling.js';
 import { signalingService } from '../services/SignalingService.js';
 import { webrtcService } from '../services/WebRTCService.js';
 import { useConnectionStore } from '../stores/connectionStore.js';
 import { useDeviceStore } from '../stores/deviceStore.js';
+import { stopLocalCapture } from './useScreenShare.js';
 
 const DEFAULT_SIGNALING_URL = 'http://localhost:3001';
 
@@ -31,13 +33,14 @@ function armNegotiationTimer(): void {
 }
 
 /**
- * Tear down a dead session: close the peer connection, release the server
- * room (the peer sees `peer-disconnected`), and surface a human error.
+ * Tear down a dead session: stop capture, close the peer connection, release
+ * the server room (the peer sees `peer-disconnected`), surface a human error.
  */
 function failSession(message: string): void {
   clearNegotiationTimer();
   const store = useConnectionStore.getState();
   const roomId = store.roomId;
+  stopLocalCapture();
   webrtcService.close();
   void signalingService.disconnectSession(roomId).catch(() => {
     // Local reset is required even if the server is already gone.
@@ -98,6 +101,25 @@ export function useSignalingSession(): {
           .catch(() => {
             // Peer may be gone; connection-state events report the outcome.
           });
+      },
+      onRemoteStream: (stream) => {
+        useConnectionStore.getState().setRemoteStream(stream);
+      },
+      onControlMessage: (data) => {
+        // Trust comes from the channel itself (only the peer holds it);
+        // the frame content is still validated before acting on it.
+        const message = parseControlMessage(data);
+        if (!message) return;
+        const store = useConnectionStore.getState();
+        if (message.kind === 'video-tracks-added') {
+          if (store.role === 'client' && store.roomId && store.status === 'connected') {
+            void sendReoffer(store.roomId);
+          }
+        } else if (message.kind === 'video-tracks-ended') {
+          if (store.role === 'client') {
+            store.setRemoteStream(null);
+          }
+        }
       },
     });
 
@@ -165,6 +187,7 @@ export function useSignalingSession(): {
       },
       onPeerDisconnected: (payload) => {
         const store = useConnectionStore.getState();
+        stopLocalCapture();
         webrtcService.close();
         clearNegotiationTimer();
         if (payload.reason === 'timeout') {
@@ -231,6 +254,7 @@ export function useSignalingSession(): {
     } catch {
       // Host still clears local UI so a failed ack cannot leave a stuck modal.
     }
+    stopLocalCapture();
     webrtcService.close();
     clearNegotiationTimer();
     store.setIncoming(null);
@@ -240,6 +264,7 @@ export function useSignalingSession(): {
 
   async function disconnectSession(): Promise<void> {
     const store = useConnectionStore.getState();
+    stopLocalCapture();
     webrtcService.close();
     clearNegotiationTimer();
     try {
@@ -263,6 +288,20 @@ async function createAndSendOffer(roomId: string): Promise<void> {
     failSession(
       error instanceof Error ? error.message : SIGNALING_ERROR_MESSAGES.NEGOTIATION_TIMEOUT,
     );
+  }
+}
+
+/**
+ * Client role: re-offer on the live connection after the host attached
+ * screen tracks. No negotiation timer — the session is already `connected`;
+ * a failed re-offer still tears the session down (the peer is gone).
+ */
+async function sendReoffer(roomId: string): Promise<void> {
+  try {
+    const offer = await webrtcService.createOffer();
+    await signalingService.sendOffer(roomId, offer.sdp);
+  } catch (error) {
+    failSession(error instanceof Error ? error.message : SIGNALING_ERROR_MESSAGES.ICE_FAILED);
   }
 }
 

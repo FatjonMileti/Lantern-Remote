@@ -13,6 +13,7 @@ export interface WebRTCEvents {
   onIceCandidate?: (candidate: RTCIceCandidate) => void;
   onControlOpen?: () => void;
   onControlMessage?: (data: string) => void;
+  onRemoteStream?: (stream: MediaStream) => void;
 }
 
 export interface SessionDescription {
@@ -54,19 +55,24 @@ export class WebRTCService {
     return this.pc?.iceConnectionState ?? 'new';
   }
 
-  /** Client role: create an offer after the host accepted. */
+  /** Client role: create an offer after the host accepted. Reusable for re-offers. */
   async createOffer(): Promise<SessionDescription> {
-    const pc = this.createPeerConnection();
-    this.controlChannel = pc.createDataChannel(CONTROL_CHANNEL_LABEL);
-    this.wireControlChannel(this.controlChannel);
+    // Fresh connection: open the `control` channel. Re-offers reuse the live
+    // peer connection (and its channel) so no renegotiation loop starts.
+    const fresh = this.pc === null;
+    const pc = this.ensurePeerConnection();
+    if (fresh) {
+      this.controlChannel = pc.createDataChannel(CONTROL_CHANNEL_LABEL);
+      this.wireControlChannel(this.controlChannel);
+    }
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     return toSessionDescription(pc.localDescription, 'offer');
   }
 
-  /** Host role: answer an incoming offer. */
+  /** Host role: answer an incoming offer (initial or re-offer). */
   async acceptOffer(offer: SessionDescription): Promise<SessionDescription> {
-    const pc = this.createPeerConnection();
+    const pc = this.ensurePeerConnection();
     await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: offer.sdp }));
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
@@ -94,6 +100,53 @@ export class WebRTCService {
     );
   }
 
+  /**
+   * Attach captured screen tracks to the live connection. Requires an
+   * existing peer connection — callers share only while `connected`.
+   * Triggers `negotiationneeded` locally; the host must NOT re-offer
+   * (server only routes client→host offers), so the host notifies the
+   * client over `control` and the client re-offers instead.
+   */
+  addLocalStream(stream: MediaStream): void {
+    const pc = this.requirePeerConnection();
+    const known = new Set(pc.getSenders().map((sender) => sender.track));
+    for (const track of stream.getTracks()) {
+      if (!known.has(track)) {
+        pc.addTrack(track, stream);
+      }
+    }
+  }
+
+  /** Detach all locally shared tracks (fires `negotiationneeded`, ignored). */
+  removeLocalStream(): void {
+    const pc = this.pc;
+    if (!pc) return;
+    for (const sender of pc.getSenders()) {
+      try {
+        pc.removeTrack(sender);
+      } catch {
+        // Sender may already be gone during teardown; ignore.
+      }
+    }
+  }
+
+  /**
+   * Send a text frame on the `control` channel.
+   * Returns false when the channel is not open — callers must handle that
+   * (e.g. refuse to share before the connection is ready) instead of
+   * queueing unbounded state.
+   */
+  sendControlMessage(data: string): boolean {
+    const channel = this.controlChannel;
+    if (!channel || channel.readyState !== 'open') return false;
+    try {
+      channel.send(data);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   close(): void {
     try {
       this.controlChannel?.close();
@@ -106,6 +159,7 @@ export class WebRTCService {
       this.pc.oniceconnectionstatechange = null;
       this.pc.onicecandidate = null;
       this.pc.ondatachannel = null;
+      this.pc.ontrack = null;
       try {
         this.pc.close();
       } catch {
@@ -115,11 +169,15 @@ export class WebRTCService {
     }
   }
 
-  private createPeerConnection(): RTCPeerConnection {
-    this.close();
+  /**
+   * Return the live peer connection, creating it on first use. Reuse (not
+   * replace) is what makes client-initiated re-offers possible without
+   * dropping the `control` channel or gathered ICE state.
+   */
+  private ensurePeerConnection(): RTCPeerConnection {
+    if (this.pc) return this.pc;
     const pc = new RTCPeerConnection({ iceServers: buildIceServers() });
     this.pc = pc;
-
     pc.onconnectionstatechange = () => {
       this.events.onConnectionState?.(pc.connectionState);
     };
@@ -140,6 +198,12 @@ export class WebRTCService {
       if (event.channel.label === CONTROL_CHANNEL_LABEL) {
         this.controlChannel = event.channel;
         this.wireControlChannel(event.channel);
+      }
+    };
+    pc.ontrack = (event) => {
+      const [stream] = event.streams;
+      if (stream) {
+        this.events.onRemoteStream?.(stream);
       }
     };
     return pc;

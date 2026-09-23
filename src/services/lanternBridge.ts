@@ -5,7 +5,7 @@
  * so future phases (signaling, capture, input) gain validation/retry
  * in one place instead of scattered `window` accesses.
  */
-import type { AppInfo } from '../../shared/ipc.js';
+import type { AppInfo, DesktopSource } from '../../shared/ipc.js';
 
 function bridge(): Window['lantern'] {
   if (!window.lantern) {
@@ -20,4 +20,8 @@ export function getDeviceId(): Promise<string> {
 
 export function getAppInfo(): Promise<AppInfo> {
   return bridge().getAppInfo();
+}
+
+export function getDesktopSources(): Promise<DesktopSource[]> {
+  return bridge().getDesktopSources();
 }

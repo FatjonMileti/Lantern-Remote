@@ -47,7 +47,7 @@ two-instance instructions); Client enters Host ID → Host sees
 
 ---
 
-## Phase 3 — WebRTC signaling (offer/answer/ICE) — DONE (uncommitted)
+## Phase 3 — WebRTC signaling (offer/answer/ICE) — DONE
 
 **Goal:** Client ↔ Host exchange SDP + ICE through the server.
 
@@ -86,21 +86,38 @@ Session cards show `connected` with matching `rtcState`/`iceState`.
 
 ---
 
-## Phase 4 — Screen capture + streaming
+## Phase 4 — Screen capture + streaming — DONE (uncommitted)
 
 **Goal:** one instance streams its desktop to the other over WebRTC.
 
-- [ ] Create `ScreenCaptureService` (host side):
-      enumerate displays, select display, `getDisplayMedia`/Electron
-      `desktopCapturer` per installed Electron version, return `MediaStream`,
-      stop, error handling (denied, unavailable).
-- [ ] Host must explicitly start sharing; add IPC channels in `shared/ipc.ts`.
-- [ ] Attach host tracks to peer connection; client renders remote stream.
-- [ ] Multi-monitor support if practical; clear "Not supported" otherwise.
+- [x] Created `ScreenCaptureService` (`src/services/`) + `DesktopSourcesService`
+      (`electron/services/`, Electron 44 `desktopCapturer`): enumerate displays
+      with thumbnail previews, `getUserMedia` capture by source id, stop,
+      mapped errors (denied / unavailable / unsupported). Audio off (video-only).
+- [x] Host shares only via explicit Start sharing (`ScreenShareControls` +
+      `useScreenShare`); added `GET_DESKTOP_SOURCES` IPC in `shared/ipc.ts`
+      with preload/main/renderer in sync. No auto-share on connect.
+- [x] Host tracks attach via `WebRTCService.addLocalStream`; client re-offers
+      over the existing connection after a `video-tracks-added` control frame
+      (no server changes — client→host offers were already routable); host
+      answers with tracks, client renders in `RemoteVideo` (Phase 5 builds the
+      full viewer). `video-tracks-ended` clears the viewer; every teardown path
+      stops capture tracks so a dead session never keeps sharing.
+- [x] Multi-monitor: source picker lists all `screen` sources with thumbnails.
+      Unsupported environments get a clear message instead of silent failure.
 
-**Verify:** Host clicks Share → Client sees live host desktop.
+**Verify:** `typecheck` ✅, `lint` ✅, control-message parser 6/6 ✅
+(round-trip both kinds; garbage/unknown-kind/binary/null rejected), app boot
+clean ✅ (fresh profile, no IPC errors).
+NOT verified headless: live pixels from host to client (needs two GUIs +
+display capture) — do the manual run below.
 
-**Commit:** `feat: implement screen capture`
+**Manual test:** `npm run server` + two instances (AGENTS.md recipe). Client
+connects → host Accepts → both `connected` → host picks a display → Start
+sharing → client `Remote Screen` card shows the live host desktop. Stop
+sharing → client viewer clears. Disconnect → capture tracks stop.
+
+**Commit:** `feat: implement screen capture` (pending)
 
 ---
 
