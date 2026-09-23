@@ -2,8 +2,10 @@ import type { Server, Socket } from 'socket.io';
 import {
   SIGNALING_EVENTS,
   parseConnectionRequestPayload,
+  parseIceCandidatePayload,
   parseRegisterDevicePayload,
   parseRoomActionPayload,
+  parseSessionPayload,
   signalingError,
   type SignalingAck,
 } from '../../shared/signaling.js';
@@ -171,6 +173,97 @@ export function registerSocketHandlers(
       ackOk(ack, room.id);
     },
   );
+
+  /**
+   * WebRTC signaling relay. The server forwards SDP/ICE between the two room
+   * members only — it never inspects media and enforces direction
+   * (offers flow client→host, answers host→client) plus room membership.
+   * Peer sockets resolve via the registry so reconnects stay fresh.
+   */
+  socket.on(SIGNALING_EVENTS.WEBRTC_OFFER, (raw: unknown, ack?: (r: SignalingAck) => void) => {
+    const senderId = registry.getDeviceId(socket.id);
+    if (!senderId) {
+      ackErr(ack, 'NOT_REGISTERED');
+      return;
+    }
+    const payload = parseSessionPayload(raw, 'offer');
+    if (!payload) {
+      ackErr(ack, 'ROOM_NOT_FOUND');
+      return;
+    }
+    const room = rooms.get(payload.roomId);
+    if (!room || room.status !== 'accepted' || room.clientDeviceId !== senderId) {
+      ackErr(ack, room ? 'UNAUTHORIZED' : 'ROOM_NOT_FOUND');
+      return;
+    }
+    const hostSocket = registry.getSocket(room.hostDeviceId);
+    if (!hostSocket?.connected) {
+      ackErr(ack, 'DEVICE_OFFLINE');
+      return;
+    }
+    hostSocket.emit(SIGNALING_EVENTS.WEBRTC_OFFER, payload);
+    ackOk(ack, room.id);
+  });
+
+  socket.on(SIGNALING_EVENTS.WEBRTC_ANSWER, (raw: unknown, ack?: (r: SignalingAck) => void) => {
+    const senderId = registry.getDeviceId(socket.id);
+    if (!senderId) {
+      ackErr(ack, 'NOT_REGISTERED');
+      return;
+    }
+    const payload = parseSessionPayload(raw, 'answer');
+    if (!payload) {
+      ackErr(ack, 'ROOM_NOT_FOUND');
+      return;
+    }
+    const room = rooms.get(payload.roomId);
+    if (!room || room.status !== 'accepted' || room.hostDeviceId !== senderId) {
+      ackErr(ack, room ? 'UNAUTHORIZED' : 'ROOM_NOT_FOUND');
+      return;
+    }
+    const clientSocket = registry.getSocket(room.clientDeviceId);
+    if (!clientSocket?.connected) {
+      ackErr(ack, 'DEVICE_OFFLINE');
+      return;
+    }
+    clientSocket.emit(SIGNALING_EVENTS.WEBRTC_ANSWER, payload);
+    ackOk(ack, room.id);
+  });
+
+  socket.on(SIGNALING_EVENTS.ICE_CANDIDATE, (raw: unknown, ack?: (r: SignalingAck) => void) => {
+    const senderId = registry.getDeviceId(socket.id);
+    if (!senderId) {
+      ackErr(ack, 'NOT_REGISTERED');
+      return;
+    }
+    const payload = parseIceCandidatePayload(raw);
+    if (!payload) {
+      ackErr(ack, 'ROOM_NOT_FOUND');
+      return;
+    }
+    const room = rooms.get(payload.roomId);
+    if (!room || room.status !== 'accepted') {
+      ackErr(ack, 'ROOM_NOT_FOUND');
+      return;
+    }
+    const peerDeviceId =
+      room.clientDeviceId === senderId
+        ? room.hostDeviceId
+        : room.hostDeviceId === senderId
+          ? room.clientDeviceId
+          : null;
+    if (!peerDeviceId) {
+      ackErr(ack, 'UNAUTHORIZED');
+      return;
+    }
+    const peerSocket = registry.getSocket(peerDeviceId);
+    if (!peerSocket?.connected) {
+      ackErr(ack, 'DEVICE_OFFLINE');
+      return;
+    }
+    peerSocket.emit(SIGNALING_EVENTS.ICE_CANDIDATE, payload);
+    ackOk(ack, room.id);
+  });
 
   socket.on('disconnect', () => {
     const deviceId = registry.unregisterSocket(socket.id);

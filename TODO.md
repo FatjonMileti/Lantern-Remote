@@ -47,24 +47,42 @@ two-instance instructions); Client enters Host ID → Host sees
 
 ---
 
-## Phase 3 — WebRTC signaling (offer/answer/ICE)
+## Phase 3 — WebRTC signaling (offer/answer/ICE) — DONE (uncommitted)
 
 **Goal:** Client ↔ Host exchange SDP + ICE through the server.
 
-- [ ] Create `src/services/WebRTCService.ts` (renderer-side, no JSX logic):
-      create peer connection, offer/answer, ICE handling, connection-state
+- [x] Created `src/services/WebRTCService.ts` (renderer-side, no JSX logic):
+      peer connection, offer/answer, ICE trickle, `control` DataChannel
+      (offerer creates, answerer receives via `ondatachannel`), state
       monitoring (`new→connecting→connected→disconnected→failed→closed`),
-      reconnect/cleanup.
-- [ ] STUN config from env (`STUN_SERVERS`), design ready for future TURN.
-- [ ] Route `webrtc-offer`, `webrtc-answer`, `ice-candidate` via server rooms.
-- [ ] Drive `connectionStore` through
-      `idle→connecting→waiting-for-approval→approved→negotiating→connected/disconnected/failed`.
-- [ ] Handle negotiation failure, ICE failure, timeouts with user-facing errors.
+      idempotent cleanup. No media tracks yet (Phase 4).
+- [x] STUN config from env (`VITE_STUN_SERVERS`, default Google STUN);
+      `buildIceServers()` shaped so TURN entries append later without changes.
+- [x] Routed `webrtc-offer`, `webrtc-answer`, `ice-candidate` via server rooms
+      (`server/socket/handlers.ts`): registered-only, accepted-rooms-only,
+      direction enforced (offers client→host, answers host→client, ICE either
+      member), peer sockets resolved via registry, SDP (32 KB) and candidate
+      (4 KB) length caps. Renderer re-validates relayed payloads.
+- [x] `connectionStore` drives
+      `idle→connecting→waiting-for-approval→approved→negotiating→connected/disconnected/failed`
+      plus `role` (`client`|`host`) and live `rtcState`/`iceState` shown in
+      `ConnectionStatus`. Roles checked on every inbound offer/answer/ICE.
+- [x] Negotiation failure, ICE failure, and 20 s negotiation timeout tear the
+      session down and surface human errors (`NEGOTIATION_TIMEOUT`,
+      `ICE_FAILED`); stale ICE candidates after teardown are ignored.
 
-**Verify:** DevTools/`Logger` shows offer→answer→ICE flowing C→S→H→S→C
-and peer state reaching `connected` (no media yet).
+**Verify:** `typecheck` ✅, `lint` ✅, throwaway tsx routing test 18/18 ✅
+(offer/answer/ICE relay intact both ways, `null` ICE fields preserved,
+outsider + wrong-direction + oversized-SDP rejected, peer notified on leave;
+script deleted after run), app boot clean ✅ (window ready, no IPC errors).
+NOT verified headless: live `RTCPeerConnection` reaching `connected` between
+two real instances (no `wrtc` in tree) — do the manual two-instance run below.
 
-**Commit:** `feat: implement webrtc signaling`
+**Manual test:** `npm run server` + two instances (AGENTS.md recipe); client
+enters host ID → host Accepts → client offer→host answer→ICE flows and both
+Session cards show `connected` with matching `rtcState`/`iceState`.
+
+**Commit:** `feat: implement webrtc signaling` (pending)
 
 ---
 

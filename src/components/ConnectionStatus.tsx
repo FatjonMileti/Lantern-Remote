@@ -5,6 +5,9 @@ export function ConnectionStatus() {
   const status = useConnectionStore((s) => s.status);
   const signalingConnected = useConnectionStore((s) => s.signalingConnected);
   const incoming = useConnectionStore((s) => s.incoming);
+  const role = useConnectionStore((s) => s.role);
+  const rtcState = useConnectionStore((s) => s.rtcState);
+  const iceState = useConnectionStore((s) => s.iceState);
 
   return (
     <section className="card" aria-label="Connection status">
@@ -14,8 +17,11 @@ export function ConnectionStatus() {
       </p>
       <p className="hint">
         Signaling {signalingConnected ? 'connected' : 'disconnected'}
+        {role ? ` · Role: ${role}` : ''}
         {incoming ? ` · Incoming from ${incoming.fromDeviceId}` : ''}
-        {status === 'approved' ? ' · Host accepted (WebRTC in Phase 3)' : ''}
+      </p>
+      <p className="hint">
+        WebRTC: <strong>{rtcState}</strong> · ICE: <strong>{iceState}</strong>
       </p>
     </section>
   );

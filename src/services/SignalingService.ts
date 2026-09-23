@@ -2,14 +2,18 @@ import { io, type Socket } from 'socket.io-client';
 import { parseDeviceId } from '../../shared/deviceId.js';
 import {
   CONNECTION_REQUEST_TIMEOUT_MS,
+  MAX_ICE_CANDIDATE_LENGTH,
+  MAX_SDP_LENGTH,
   SIGNALING_ERROR_MESSAGES,
   SIGNALING_EVENTS,
   signalingError,
   type ConnectionDecisionPayload,
+  type IceCandidatePayload,
   type IncomingConnectionPayload,
   type PeerDisconnectedPayload,
   type SignalingAck,
   type SignalingErrorCode,
+  type WebRTCSessionPayload,
 } from '../../shared/signaling.js';
 
 export type SignalingListener = {
@@ -17,6 +21,9 @@ export type SignalingListener = {
   onAccepted?: (payload: ConnectionDecisionPayload) => void;
   onRejected?: (payload: ConnectionDecisionPayload) => void;
   onPeerDisconnected?: (payload: PeerDisconnectedPayload) => void;
+  onOffer?: (payload: WebRTCSessionPayload) => void;
+  onAnswer?: (payload: WebRTCSessionPayload) => void;
+  onIceCandidate?: (payload: IceCandidatePayload) => void;
   onConnected?: () => void;
   onDisconnected?: () => void;
   onUnavailable?: (message: string) => void;
@@ -114,6 +121,21 @@ export class SignalingService {
       const payload = parsePeerDisconnected(raw);
       if (payload) this.listeners.onPeerDisconnected?.(payload);
     });
+
+    socket.on(SIGNALING_EVENTS.WEBRTC_OFFER, (raw: unknown) => {
+      const payload = parseSessionPayload(raw, 'offer');
+      if (payload) this.listeners.onOffer?.(payload);
+    });
+
+    socket.on(SIGNALING_EVENTS.WEBRTC_ANSWER, (raw: unknown) => {
+      const payload = parseSessionPayload(raw, 'answer');
+      if (payload) this.listeners.onAnswer?.(payload);
+    });
+
+    socket.on(SIGNALING_EVENTS.ICE_CANDIDATE, (raw: unknown) => {
+      const payload = parseIcePayload(raw);
+      if (payload) this.listeners.onIceCandidate?.(payload);
+    });
   }
 
   async requestConnection(targetDeviceId: string): Promise<string> {
@@ -149,6 +171,43 @@ export class SignalingService {
     const socket = this.socket;
     if (!socket?.connected || !roomId) return;
     await emitWithAck(socket, SIGNALING_EVENTS.DISCONNECT_DEVICE, { roomId });
+  }
+
+  /** Client role: send the SDP offer after the host accepted. */
+  async sendOffer(roomId: string, sdp: string): Promise<void> {
+    const socket = this.requireSocket();
+    const ack = await emitWithAck(socket, SIGNALING_EVENTS.WEBRTC_OFFER, {
+      roomId,
+      sdp,
+      type: 'offer',
+    });
+    if (!ack.ok) ackError(ack, 'ROOM_NOT_FOUND');
+  }
+
+  /** Host role: send the SDP answer to an incoming offer. */
+  async sendAnswer(roomId: string, sdp: string): Promise<void> {
+    const socket = this.requireSocket();
+    const ack = await emitWithAck(socket, SIGNALING_EVENTS.WEBRTC_ANSWER, {
+      roomId,
+      sdp,
+      type: 'answer',
+    });
+    if (!ack.ok) ackError(ack, 'ROOM_NOT_FOUND');
+  }
+
+  /** Either role: trickle one ICE candidate to the peer. */
+  async sendIceCandidate(
+    roomId: string,
+    candidate: { candidate: string; sdpMid: string | null; sdpMLineIndex: number | null },
+  ): Promise<void> {
+    const socket = this.requireSocket();
+    const ack = await emitWithAck(socket, SIGNALING_EVENTS.ICE_CANDIDATE, {
+      roomId,
+      candidate: candidate.candidate,
+      sdpMid: candidate.sdpMid,
+      sdpMLineIndex: candidate.sdpMLineIndex,
+    });
+    if (!ack.ok) ackError(ack, 'ROOM_NOT_FOUND');
   }
 
   disconnect(): void {
@@ -187,7 +246,7 @@ export class SignalingService {
 function emitWithAck(
   socket: Socket,
   event: string,
-  payload: Record<string, string>,
+  payload: Record<string, string | number | null>,
 ): Promise<SignalingAck> {
   return new Promise((resolve) => {
     socket.timeout(8000).emit(event, payload, (err: Error | null, ack: unknown) => {
@@ -227,6 +286,29 @@ function parsePeerDisconnected(value: unknown): PeerDisconnectedPayload | null {
     return null;
   }
   return { roomId: record.roomId, reason };
+}
+
+/** Re-validate relayed SDP: the server forwards but never vouches for content. */
+function parseSessionPayload(value: unknown, expectedType: 'offer' | 'answer'): WebRTCSessionPayload | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.roomId !== 'string' || typeof record.sdp !== 'string') return null;
+  if (record.sdp.length === 0 || record.sdp.length > MAX_SDP_LENGTH) return null;
+  if (record.type !== expectedType) return null;
+  return { roomId: record.roomId, sdp: record.sdp, type: expectedType };
+}
+
+function parseIcePayload(value: unknown): IceCandidatePayload | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.roomId !== 'string' || typeof record.candidate !== 'string') return null;
+  if (record.candidate.length === 0 || record.candidate.length > MAX_ICE_CANDIDATE_LENGTH) {
+    return null;
+  }
+  const { sdpMid, sdpMLineIndex } = record;
+  if (sdpMid !== null && typeof sdpMid !== 'string') return null;
+  if (sdpMLineIndex !== null && typeof sdpMLineIndex !== 'number') return null;
+  return { roomId: record.roomId, candidate: record.candidate, sdpMid, sdpMLineIndex };
 }
 
 export const signalingService = new SignalingService();

@@ -17,6 +17,9 @@ export const SIGNALING_EVENTS = {
   PEER_DISCONNECTED: 'peer-disconnected',
   DEVICE_ONLINE: 'device-online',
   DEVICE_OFFLINE: 'device-offline',
+  WEBRTC_OFFER: 'webrtc-offer',
+  WEBRTC_ANSWER: 'webrtc-answer',
+  ICE_CANDIDATE: 'ice-candidate',
 } as const;
 
 export type SignalingEvent = (typeof SIGNALING_EVENTS)[keyof typeof SIGNALING_EVENTS];
@@ -31,7 +34,9 @@ export type SignalingErrorCode =
   | 'UNAUTHORIZED'
   | 'ROOM_NOT_FOUND'
   | 'ALREADY_IN_SESSION'
-  | 'NOT_REGISTERED';
+  | 'NOT_REGISTERED'
+  | 'NEGOTIATION_TIMEOUT'
+  | 'ICE_FAILED';
 
 export const SIGNALING_ERROR_MESSAGES: Record<SignalingErrorCode, string> = {
   SERVER_UNAVAILABLE:
@@ -45,6 +50,8 @@ export const SIGNALING_ERROR_MESSAGES: Record<SignalingErrorCode, string> = {
   ROOM_NOT_FOUND: 'That connection is no longer available.',
   ALREADY_IN_SESSION: 'A connection request is already in progress.',
   NOT_REGISTERED: 'This device is not registered with the signaling server.',
+  NEGOTIATION_TIMEOUT: 'The peer did not complete WebRTC negotiation in time.',
+  ICE_FAILED: 'Could not establish a direct peer connection (ICE failed).',
 };
 
 export function signalingError(
@@ -84,12 +91,32 @@ export interface DevicePresencePayload {
   deviceId: string;
 }
 
+/** SDP offer/answer routed between the two room members. Never media. */
+export interface WebRTCSessionPayload {
+  roomId: string;
+  sdp: string;
+  type: 'offer' | 'answer';
+}
+
+/** Trickled ICE candidate routed between the two room members. */
+export interface IceCandidatePayload {
+  roomId: string;
+  candidate: string;
+  sdpMid: string | null;
+  sdpMLineIndex: number | null;
+}
+
 export type SignalingAck =
   | { ok: true; roomId?: string }
   | { ok: false; error: { code: SignalingErrorCode; message: string } };
 
 export const CONNECTION_REQUEST_TIMEOUT_MS = 30_000;
 export const PENDING_ROOM_TTL_MS = 35_000;
+export const NEGOTIATION_TIMEOUT_MS = 20_000;
+
+/** SDP is text; cap it so a malicious peer cannot flood the server. */
+export const MAX_SDP_LENGTH = 32_768;
+export const MAX_ICE_CANDIDATE_LENGTH = 4_096;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -129,4 +156,33 @@ export function parseRoomActionPayload(value: unknown): RoomActionPayload | null
   const roomId = readString(record, 'roomId');
   if (!roomId || roomId.length < 8 || roomId.length > 80) return null;
   return { roomId };
+}
+
+export function parseSessionPayload(
+  value: unknown,
+  expectedType: 'offer' | 'answer',
+): WebRTCSessionPayload | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  const room = parseRoomActionPayload(value);
+  if (!room) return null;
+  const sdp = readString(record, 'sdp');
+  const type = readString(record, 'type');
+  if (!sdp || sdp.length > MAX_SDP_LENGTH) return null;
+  if (type !== expectedType) return null;
+  return { roomId: room.roomId, sdp, type: expectedType };
+}
+
+export function parseIceCandidatePayload(value: unknown): IceCandidatePayload | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  const room = parseRoomActionPayload(value);
+  if (!room) return null;
+  const candidate = readString(record, 'candidate');
+  if (!candidate || candidate.length > MAX_ICE_CANDIDATE_LENGTH) return null;
+  const sdpMid = record.sdpMid;
+  const sdpMLineIndex = record.sdpMLineIndex;
+  if (sdpMid !== null && typeof sdpMid !== 'string') return null;
+  if (sdpMLineIndex !== null && typeof sdpMLineIndex !== 'number') return null;
+  return { roomId: room.roomId, candidate, sdpMid, sdpMLineIndex };
 }

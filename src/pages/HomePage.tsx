@@ -40,7 +40,7 @@ export function HomePage() {
         <SettingsPanel />
       </div>
       <footer className="footer">
-        <span>Phase 2 — signaling is live. WebRTC negotiation arrives in Phase 3.</span>
+        <span>Phase 3 — WebRTC negotiation is live. Screen sharing arrives in Phase 4.</span>
       </footer>
       {incoming && (
         <IncomingRequestModal

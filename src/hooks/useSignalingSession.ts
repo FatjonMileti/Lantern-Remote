@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { formatDeviceId } from '../../shared/deviceId.js';
-import { SIGNALING_ERROR_MESSAGES } from '../../shared/signaling.js';
+import { NEGOTIATION_TIMEOUT_MS, SIGNALING_ERROR_MESSAGES } from '../../shared/signaling.js';
 import { signalingService } from '../services/SignalingService.js';
+import { webrtcService } from '../services/WebRTCService.js';
 import { useConnectionStore } from '../stores/connectionStore.js';
 import { useDeviceStore } from '../stores/deviceStore.js';
 
@@ -11,8 +12,47 @@ function signalingUrl(): string {
   return import.meta.env.VITE_SIGNALING_SERVER_URL ?? DEFAULT_SIGNALING_URL;
 }
 
+let negotiationTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearNegotiationTimer(): void {
+  if (negotiationTimer) {
+    clearTimeout(negotiationTimer);
+    negotiationTimer = null;
+  }
+}
+
+function armNegotiationTimer(): void {
+  clearNegotiationTimer();
+  negotiationTimer = setTimeout(() => {
+    const store = useConnectionStore.getState();
+    if (store.status !== 'negotiating') return;
+    failSession(SIGNALING_ERROR_MESSAGES.NEGOTIATION_TIMEOUT);
+  }, NEGOTIATION_TIMEOUT_MS);
+}
+
 /**
- * Wires SignalingService into the connection store. Components stay presentational.
+ * Tear down a dead session: close the peer connection, release the server
+ * room (the peer sees `peer-disconnected`), and surface a human error.
+ */
+function failSession(message: string): void {
+  clearNegotiationTimer();
+  const store = useConnectionStore.getState();
+  const roomId = store.roomId;
+  webrtcService.close();
+  void signalingService.disconnectSession(roomId).catch(() => {
+    // Local reset is required even if the server is already gone.
+  });
+  store.reset();
+  store.setStatus('failed');
+  store.setError(message);
+}
+
+/**
+ * Wires signaling + WebRTC into the connection store.
+ * Components stay presentational; all negotiation lives here.
+ *
+ * Flow: client requests → host accepts → client offers → host answers →
+ * both trickle ICE → `connected`. Roles: the requester always offers.
  */
 export function useSignalingSession(): {
   connectToRemote: () => Promise<void>;
@@ -25,6 +65,41 @@ export function useSignalingSession(): {
 
   useEffect(() => {
     if (loading || !deviceId || deviceId.includes('·')) return undefined;
+
+    webrtcService.setEvents({
+      onConnectionState: (state) => {
+        const store = useConnectionStore.getState();
+        store.setRtcState(state);
+        if (state === 'connected') {
+          clearNegotiationTimer();
+          store.setStatus('connected');
+          store.setError(null);
+        } else if (state === 'failed') {
+          failSession(SIGNALING_ERROR_MESSAGES.ICE_FAILED);
+        } else if (state === 'disconnected' || state === 'closed') {
+          // Transient blips also land here; reconnect arrives in Phase 4+.
+          clearNegotiationTimer();
+          webrtcService.close();
+          store.setStatus('disconnected');
+        }
+      },
+      onIceState: (state) => {
+        useConnectionStore.getState().setIceState(state);
+      },
+      onIceCandidate: (candidate) => {
+        const store = useConnectionStore.getState();
+        if (!store.roomId) return;
+        void signalingService
+          .sendIceCandidate(store.roomId, {
+            candidate: candidate.candidate,
+            sdpMid: candidate.sdpMid,
+            sdpMLineIndex: candidate.sdpMLineIndex,
+          })
+          .catch(() => {
+            // Peer may be gone; connection-state events report the outcome.
+          });
+      },
+    });
 
     signalingService.setListeners({
       onConnected: () => {
@@ -46,13 +121,15 @@ export function useSignalingSession(): {
           fromDeviceId: formatDeviceId(payload.fromDeviceId),
         });
         store.setRoomId(payload.roomId);
+        store.setRole('host');
         store.setStatus('waiting-for-approval');
       },
       onAccepted: (payload) => {
         const store = useConnectionStore.getState();
         store.setRoomId(payload.roomId);
-        store.setStatus('approved');
+        store.setStatus('negotiating');
         store.setError(null);
+        void createAndSendOffer(payload.roomId);
       },
       onRejected: () => {
         const store = useConnectionStore.getState();
@@ -61,8 +138,35 @@ export function useSignalingSession(): {
         store.setIncoming(null);
         store.setRoomId(null);
       },
+      onOffer: (payload) => {
+        const store = useConnectionStore.getState();
+        if (store.role !== 'host' || store.roomId !== payload.roomId) return;
+        void answerOffer(payload.roomId, payload.sdp);
+      },
+      onAnswer: (payload) => {
+        const store = useConnectionStore.getState();
+        if (store.role !== 'client' || store.roomId !== payload.roomId) return;
+        void webrtcService.acceptAnswer({ sdp: payload.sdp, type: 'answer' }).catch((error) => {
+          failSession(error instanceof Error ? error.message : SIGNALING_ERROR_MESSAGES.ICE_FAILED);
+        });
+      },
+      onIceCandidate: (payload) => {
+        const store = useConnectionStore.getState();
+        if (!store.roomId || store.roomId !== payload.roomId) return;
+        void webrtcService
+          .addIceCandidate({
+            candidate: payload.candidate,
+            sdpMid: payload.sdpMid,
+            sdpMLineIndex: payload.sdpMLineIndex,
+          })
+          .catch(() => {
+            // Stale candidates after teardown are harmless; ignore.
+          });
+      },
       onPeerDisconnected: (payload) => {
         const store = useConnectionStore.getState();
+        webrtcService.close();
+        clearNegotiationTimer();
         if (payload.reason === 'timeout') {
           store.setError(SIGNALING_ERROR_MESSAGES.TIMEOUT);
           store.setStatus('failed');
@@ -77,6 +181,8 @@ export function useSignalingSession(): {
     signalingService.connect(signalingUrl(), deviceId);
 
     return () => {
+      clearNegotiationTimer();
+      webrtcService.close();
       signalingService.setListeners({});
       signalingService.disconnect();
     };
@@ -85,12 +191,14 @@ export function useSignalingSession(): {
   async function connectToRemote(): Promise<void> {
     const store = useConnectionStore.getState();
     store.setError(null);
+    store.setRole('client');
     store.setStatus('connecting');
     try {
       const roomId = await signalingService.requestConnection(store.remoteId);
       store.setRoomId(roomId);
       store.setStatus('waiting-for-approval');
     } catch (error) {
+      store.setRole(null);
       store.setStatus('failed');
       store.setError(error instanceof Error ? error.message : SIGNALING_ERROR_MESSAGES.INVALID_ID);
     }
@@ -103,8 +211,9 @@ export function useSignalingSession(): {
     try {
       await signalingService.accept(incoming.roomId);
       store.setIncoming(null);
-      store.setStatus('approved');
+      store.setStatus('negotiating');
       store.setError(null);
+      armNegotiationTimer();
     } catch (error) {
       store.setStatus('failed');
       store.setError(
@@ -122,6 +231,8 @@ export function useSignalingSession(): {
     } catch {
       // Host still clears local UI so a failed ack cannot leave a stuck modal.
     }
+    webrtcService.close();
+    clearNegotiationTimer();
     store.setIncoming(null);
     store.setRoomId(null);
     store.setStatus('idle');
@@ -129,6 +240,8 @@ export function useSignalingSession(): {
 
   async function disconnectSession(): Promise<void> {
     const store = useConnectionStore.getState();
+    webrtcService.close();
+    clearNegotiationTimer();
     try {
       await signalingService.disconnectSession(store.roomId);
     } catch {
@@ -138,4 +251,29 @@ export function useSignalingSession(): {
   }
 
   return { connectToRemote, acceptIncoming, rejectIncoming, disconnectSession };
+}
+
+/** Client role: build the offer and send it once accepted. */
+async function createAndSendOffer(roomId: string): Promise<void> {
+  armNegotiationTimer();
+  try {
+    const offer = await webrtcService.createOffer();
+    await signalingService.sendOffer(roomId, offer.sdp);
+  } catch (error) {
+    failSession(
+      error instanceof Error ? error.message : SIGNALING_ERROR_MESSAGES.NEGOTIATION_TIMEOUT,
+    );
+  }
+}
+
+/** Host role: answer an incoming offer. */
+async function answerOffer(roomId: string, sdp: string): Promise<void> {
+  try {
+    const answer = await webrtcService.acceptOffer({ sdp, type: 'offer' });
+    await signalingService.sendAnswer(roomId, answer.sdp);
+  } catch (error) {
+    failSession(
+      error instanceof Error ? error.message : SIGNALING_ERROR_MESSAGES.NEGOTIATION_TIMEOUT,
+    );
+  }
 }

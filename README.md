@@ -5,9 +5,9 @@ A portfolio-quality project demonstrating real-time communication, desktop captu
 and secure Electron architecture. Inspired by the _architecture_ of tools like
 AnyDesk/TeamViewer — no branding, proprietary UI, or code is copied.
 
-> **Phase 2 status:** Socket.IO signaling server, persisted device IDs, and
-> Connect → incoming Accept/Reject are implemented. WebRTC (Phase 3), screen
-> capture (Phase 4), and remote input (Phases 6–7) are not yet implemented.
+> **Phase 3 status:** Socket.IO signaling plus WebRTC offer/answer/ICE negotiation
+> with a `control` DataChannel. Screen capture (Phase 4) and remote input
+> (Phases 6–7) are not yet implemented.
 
 ## Architecture
 
@@ -99,13 +99,15 @@ See `SECURITY.md`. Key points:
 - WebRTC media/DataChannels are encrypted; signaling carries no video.
 - Device ID is persisted under `app.getPath('userData')`, never a MAC address.
 
-## Known limitations (Phase 2)
+## Known limitations (Phase 3)
 
-- Connect/Accept/Reject is signaling-only; no SDP/ICE/media yet.
+- Peers negotiate connectivity but exchange no media yet (Phase 4).
+- No ICE retry on `disconnected`; a failed peer tears the session down.
 - Temporary connection tokens arrive in Phase 8.
+- Single main window; no tray, no multi-monitor selection yet.
 - Single main window; no tray, no multi-monitor selection yet.
 
 ## Roadmap
 
-Phases 3–12 per spec: WebRTC → capture → viewer → mouse →
+Phases 4–12 per spec: capture → viewer → mouse →
 keyboard → auth tokens → clipboard → settings/logging → tests → polish.
