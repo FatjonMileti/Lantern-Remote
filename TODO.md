@@ -86,7 +86,7 @@ Session cards show `connected` with matching `rtcState`/`iceState`.
 
 ---
 
-## Phase 4 — Screen capture + streaming — DONE (uncommitted)
+## Phase 4 — Screen capture + streaming — DONE
 
 **Goal:** one instance streams its desktop to the other over WebRTC.
 
@@ -117,24 +117,33 @@ connects → host Accepts → both `connected` → host picks a display → Star
 sharing → client `Remote Screen` card shows the live host desktop. Stop
 sharing → client viewer clears. Disconnect → capture tracks stop.
 
-**Commit:** `feat: implement screen capture` (pending)
+**Commit:** `feat: implement screen capture`
 
 ---
 
-## Phase 5 — RemoteDesktopViewer UI
+## Phase 5 — RemoteDesktopViewer UI — DONE (uncommitted)
 
 **Goal:** professional viewer for the remote stream.
 
-- [ ] Create `RemoteDesktopViewer`: aspect-ratio-preserving video, fit/actual-size,
-      fullscreen, connection state + FPS/status overlay.
-- [ ] Create `ConnectionToolbar`: Fullscreen, Fit, Actual Size, Disconnect
-      (stubs for Quality, Monitor selection, Clipboard, File transfer).
-- [ ] Create `ConnectionRequestModal` (Accept/Reject) + `ScreenSelector`.
-- [ ] Keep components presentational; logic in services/hooks/stores.
+- [x] Created `RemoteDesktopViewer`: aspect-ratio box from intrinsic video size,
+      fit/1:1 scaling (1:1 scrolls), container fullscreen with `fullscreenchange`
+      sync (Esc never desyncs store state), FPS via `requestVideoFrameCallback`
+      (rAF fallback, handle cancelled on cleanup) + resolution overlay.
+      Stream attached imperatively via ref (React has no `srcObject` prop —
+      no casts); old `RemoteVideo` placeholder deleted.
+- [x] Created `ConnectionToolbar` (own module): Fit, 1:1, Fullscreen,
+      Disconnect. Quality / Monitor / Clipboard / Files render as inert
+      labeled stubs — visible roadmap, never pretending to work.
+- [x] Accept/Reject modal (`IncomingRequestModal`, Phase 2) and source picker
+      (inside `ScreenShareControls`, Phase 4) already existed — no duplicates
+      created.
+- [x] Components presentational; fullscreen flag is the only new store field.
 
-**Verify:** connect → viewer shows stream with working toolbar actions.
+**Verify:** `typecheck` ✅, `lint` ✅, app boot clean ✅ (fresh profile).
+NOT verified headless: real pixels + toolbar interaction need two live
+instances — same manual run as Phase 4, now checking Fit/1:1/Fullscreen/FPS.
 
-**Commit:** `feat: add remote desktop viewer`
+**Commit:** `feat: add remote desktop viewer` (pending)
 
 ---
 

@@ -5,10 +5,9 @@ A portfolio-quality project demonstrating real-time communication, desktop captu
 and secure Electron architecture. Inspired by the _architecture_ of tools like
 AnyDesk/TeamViewer — no branding, proprietary UI, or code is copied.
 
-> **Phase 4 status:** host screen capture over WebRTC — explicit Start sharing,
-> display picker with thumbnails, client re-offer over the `control` channel,
-> remote video view. Viewer polish (Phase 5) and remote input (Phases 6–7)
-> are not yet implemented.
+> **Phase 5 status:** RemoteDesktopViewer with fit/1:1 scaling, fullscreen,
+> FPS + resolution overlay, and toolbar (Disconnect + inert future stubs).
+> Remote input (Phases 6–7) is not yet implemented.
 
 ## Architecture
 
@@ -100,10 +99,9 @@ See `SECURITY.md`. Key points:
 - WebRTC media/DataChannels are encrypted; signaling carries no video.
 - Device ID is persisted under `app.getPath('userData')`, never a MAC address.
 
-## Known limitations (Phase 4)
+## Known limitations (Phase 5)
 
-- Remote video is a plain fit-to-width view; scaling modes, fullscreen,
-  and FPS overlay arrive in Phase 5.
+- Viewer is display-only; remote mouse/keyboard arrive in Phases 6–7.
 - No ICE retry on `disconnected`; a failed peer tears the session down.
 - Temporary connection tokens arrive in Phase 8.
 - Single main window; no tray, no multi-monitor selection yet.
@@ -111,5 +109,5 @@ See `SECURITY.md`. Key points:
 
 ## Roadmap
 
-Phases 5–12 per spec: viewer → mouse →
+Phases 6–12 per spec: mouse →
 keyboard → auth tokens → clipboard → settings/logging → tests → polish.

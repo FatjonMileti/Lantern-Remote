@@ -3,7 +3,7 @@ import { ConnectionStatus } from '../components/ConnectionStatus.js';
 import { DeviceIdCard } from '../components/DeviceIdCard.js';
 import { IncomingRequestModal } from '../components/IncomingRequestModal.js';
 import { RecentConnections } from '../components/RecentConnections.js';
-import { RemoteVideo } from '../components/RemoteVideo.js';
+import { RemoteDesktopViewer } from '../components/RemoteDesktopViewer.js';
 import { ScreenShareControls } from '../components/ScreenShareControls.js';
 import { SettingsPanel } from '../components/SettingsPanel.js';
 import { useScreenShare } from '../hooks/useScreenShare.js';
@@ -32,6 +32,9 @@ export function HomePage() {
   const error = useConnectionStore((s) => s.error);
   const signalingConnected = useConnectionStore((s) => s.signalingConnected);
   const incoming = useConnectionStore((s) => s.incoming);
+  const remoteStream = useConnectionStore((s) => s.remoteStream);
+  const fullscreen = useConnectionStore((s) => s.fullscreen);
+  const setFullscreen = useConnectionStore((s) => s.setFullscreen);
 
   return (
     <main className="layout">
@@ -63,12 +66,17 @@ export function HomePage() {
           onStart={() => void startSharing()}
           onStop={stopSharing}
         />
-        <RemoteVideo />
+        <RemoteDesktopViewer
+          stream={remoteStream}
+          onDisconnect={() => void disconnectSession()}
+          isFullscreen={fullscreen}
+          onFullscreenChange={setFullscreen}
+        />
         <RecentConnections />
         <SettingsPanel />
       </div>
       <footer className="footer">
-        <span>Phase 4 — screen sharing is live. Remote viewer polish arrives in Phase 5.</span>
+        <span>Phase 5 — RemoteDesktopViewer is live. Remote input arrives in Phases 6–7.</span>
       </footer>
       {incoming && (
         <IncomingRequestModal

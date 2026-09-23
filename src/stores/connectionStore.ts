@@ -21,6 +21,7 @@ interface ConnectionState {
   sharing: boolean;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
+  fullscreen: boolean;
   setRemoteId: (id: string) => void;
   setStatus: (status: ConnectionStatus) => void;
   setError: (error: string | null) => void;
@@ -33,6 +34,7 @@ interface ConnectionState {
   setSharing: (sharing: boolean) => void;
   setLocalStream: (stream: MediaStream | null) => void;
   setRemoteStream: (stream: MediaStream | null) => void;
+  setFullscreen: (fullscreen: boolean) => void;
   reset: () => void;
 }
 
@@ -56,6 +58,7 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
   sharing: false,
   localStream: null,
   remoteStream: null,
+  fullscreen: false,
   setRemoteId: (remoteId) => set({ remoteId }),
   setStatus: (status) => set({ status }),
   setError: (error) => set({ error }),
@@ -68,6 +71,7 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
   setSharing: (sharing) => set({ sharing }),
   setLocalStream: (localStream) => set({ localStream }),
   setRemoteStream: (remoteStream) => set({ remoteStream }),
+  setFullscreen: (fullscreen) => set({ fullscreen }),
   reset: () =>
     set({
       status: 'idle',
@@ -80,5 +84,6 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
       sharing: false,
       localStream: null,
       remoteStream: null,
+      fullscreen: false,
     }),
 }));
