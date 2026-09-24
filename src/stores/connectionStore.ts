@@ -4,6 +4,8 @@ import type { ConnectionStatus } from '../../shared/types.js';
 export interface IncomingRequest {
   roomId: string;
   fromDeviceId: string;
+  /** Presented code — validated against the live code before any modal. */
+  token: string;
 }
 
 export type SessionRole = 'client' | 'host';
@@ -29,6 +31,13 @@ interface ConnectionState {
   inputUnavailableReason: string | null;
   /** Last received input summary, kind + normalized coords (diagnostics). */
   lastRemoteInput: string | null;
+  /** Client-typed connection code (normalized as typed, validated on send). */
+  tokenInput: string;
+  /** Host's live code display (mirrors main; cleared on teardown). */
+  tokenCode: string | null;
+  tokenExpiresAt: number | null;
+  /** Incorrect-code attempts auto-rejected without showing a modal. */
+  blockedAttempts: number;
   setRemoteId: (id: string) => void;
   setStatus: (status: ConnectionStatus) => void;
   setError: (error: string | null) => void;
@@ -45,6 +54,9 @@ interface ConnectionState {
   setSharedDisplaySize: (size: { width: number; height: number } | null) => void;
   setInputCapability: (supported: boolean, reason: string | null) => void;
   setLastRemoteInput: (summary: string | null) => void;
+  setTokenInput: (tokenInput: string) => void;
+  setToken: (code: string | null, expiresAt: number | null) => void;
+  incrementBlockedAttempts: () => void;
   reset: () => void;
 }
 
@@ -55,6 +67,7 @@ interface ConnectionState {
  * live RTCPeerConnection and ICE states for diagnostics.
  * Phase 4 adds local/remote MediaStreams and the sharing flag.
  * Phase 6 adds shared display size, input capability, and last-input readout.
+ * Phase 8 adds connection-code fields and the blocked-attempts counter.
  */
 export const useConnectionStore = create<ConnectionState>((set) => ({
   status: 'idle',
@@ -74,6 +87,10 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
   inputSupported: false,
   inputUnavailableReason: null,
   lastRemoteInput: null,
+  tokenInput: '',
+  tokenCode: null,
+  tokenExpiresAt: null,
+  blockedAttempts: 0,
   setRemoteId: (remoteId) => set({ remoteId }),
   setStatus: (status) => set({ status }),
   setError: (error) => set({ error }),
@@ -91,6 +108,9 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
   setInputCapability: (supported, reason) =>
     set({ inputSupported: supported, inputUnavailableReason: reason }),
   setLastRemoteInput: (lastRemoteInput) => set({ lastRemoteInput }),
+  setTokenInput: (tokenInput) => set({ tokenInput }),
+  setToken: (tokenCode, tokenExpiresAt) => set({ tokenCode, tokenExpiresAt }),
+  incrementBlockedAttempts: () => set((s) => ({ blockedAttempts: s.blockedAttempts + 1 })),
   reset: () =>
     set({
       status: 'idle',
@@ -108,5 +128,8 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
       inputSupported: false,
       inputUnavailableReason: null,
       lastRemoteInput: null,
+      tokenCode: null,
+      tokenExpiresAt: null,
+      blockedAttempts: 0,
     }),
 }));

@@ -5,6 +5,7 @@
  * so future phases (signaling, capture, input) gain validation/retry
  * in one place instead of scattered `window` accesses.
  */
+import type { ConnectionTokenInfo } from '../../shared/connectionToken.js';
 import type { AppInfo, DesktopSource } from '../../shared/ipc.js';
 import type { InputAdapterStatus, RemoteInputRequest } from '../../shared/remoteInput.js';
 
@@ -33,4 +34,24 @@ export function sendRemoteInput(request: RemoteInputRequest): void {
 
 export function getRemoteInputStatus(): Promise<InputAdapterStatus> {
   return bridge().getRemoteInputStatus();
+}
+
+export function getConnectionToken(): Promise<ConnectionTokenInfo> {
+  return bridge().getConnectionToken();
+}
+
+export function regenerateConnectionToken(): Promise<ConnectionTokenInfo> {
+  return bridge().regenerateConnectionToken();
+}
+
+export function validateConnectionToken(code: string): Promise<boolean> {
+  return bridge().validateConnectionToken(code);
+}
+
+export function consumeConnectionToken(): Promise<boolean> {
+  return bridge().consumeConnectionToken();
+}
+
+export function clearConnectionToken(): Promise<void> {
+  return bridge().clearConnectionToken();
 }

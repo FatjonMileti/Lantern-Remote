@@ -4,6 +4,7 @@ import {
   parseConnectionRequestPayload,
   parseIceCandidatePayload,
   parseRegisterDevicePayload,
+  parseRejectionPayload,
   parseRoomActionPayload,
   parseSessionPayload,
   signalingError,
@@ -76,9 +77,12 @@ export function registerSocketHandlers(
         clientSocketId: socket.id,
       });
       void socket.join(room.id);
+      // The token travels to the host opaquely: the server checks its shape
+      // in the parser above, never its value — only the host holds a live code.
       hostSocket.emit(SIGNALING_EVENTS.INCOMING_CONNECTION, {
         roomId: room.id,
         fromDeviceId: requesterId,
+        token: payload.token,
       });
       ackOk(ack, room.id);
     },
@@ -124,7 +128,7 @@ export function registerSocketHandlers(
         ackErr(ack, 'NOT_REGISTERED');
         return;
       }
-      const payload = parseRoomActionPayload(raw);
+      const payload = parseRejectionPayload(raw);
       if (!payload) {
         ackErr(ack, 'ROOM_NOT_FOUND');
         return;
@@ -142,6 +146,7 @@ export function registerSocketHandlers(
       io.to(room.clientSocketId).emit(SIGNALING_EVENTS.CONNECTION_REJECTED, {
         roomId: room.id,
         hostDeviceId: hostId,
+        reason: payload.reason,
       });
       ackOk(ack, room.id);
     },

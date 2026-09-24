@@ -1,4 +1,5 @@
 import { io, type Socket } from 'socket.io-client';
+import { isValidTokenFormat } from '../../shared/connectionToken.js';
 import { parseDeviceId } from '../../shared/deviceId.js';
 import {
   CONNECTION_REQUEST_TIMEOUT_MS,
@@ -8,6 +9,7 @@ import {
   SIGNALING_EVENTS,
   signalingError,
   type ConnectionDecisionPayload,
+  type ConnectionRejectionReason,
   type IceCandidatePayload,
   type IncomingConnectionPayload,
   type PeerDisconnectedPayload,
@@ -138,14 +140,18 @@ export class SignalingService {
     });
   }
 
-  async requestConnection(targetDeviceId: string): Promise<string> {
+  async requestConnection(targetDeviceId: string, token: string): Promise<string> {
     const socket = this.requireSocket();
     const digits = parseDeviceId(targetDeviceId);
     if (!digits) {
       ackError(null, 'INVALID_ID');
     }
+    if (!isValidTokenFormat(token)) {
+      ackError(null, 'INVALID_TOKEN');
+    }
     const ack = await emitWithAck(socket, SIGNALING_EVENTS.CONNECTION_REQUEST, {
       targetDeviceId: digits,
+      token,
     });
     if (!ack.ok || !ack.roomId) {
       ackError(ack, 'DEVICE_OFFLINE');
@@ -160,9 +166,12 @@ export class SignalingService {
     if (!ack.ok) ackError(ack, 'ROOM_NOT_FOUND');
   }
 
-  async reject(roomId: string): Promise<void> {
+  async reject(roomId: string, reason: ConnectionRejectionReason = 'declined'): Promise<void> {
     const socket = this.requireSocket();
-    const ack = await emitWithAck(socket, SIGNALING_EVENTS.CONNECTION_REJECTED, { roomId });
+    const ack = await emitWithAck(socket, SIGNALING_EVENTS.CONNECTION_REJECTED, {
+      roomId,
+      reason,
+    });
     if (!ack.ok) ackError(ack, 'ROOM_NOT_FOUND');
   }
 
@@ -265,7 +274,9 @@ function parseIncoming(value: unknown): IncomingConnectionPayload | null {
   if (typeof record.roomId !== 'string' || typeof record.fromDeviceId !== 'string') return null;
   const fromDeviceId = parseDeviceId(record.fromDeviceId);
   if (!fromDeviceId) return null;
-  return { roomId: record.roomId, fromDeviceId };
+  // Shape-checked only; the host validates the value against its live code.
+  if (!isValidTokenFormat(record.token)) return null;
+  return { roomId: record.roomId, fromDeviceId, token: record.token };
 }
 
 function parseDecision(value: unknown): ConnectionDecisionPayload | null {
@@ -274,7 +285,11 @@ function parseDecision(value: unknown): ConnectionDecisionPayload | null {
   if (typeof record.roomId !== 'string' || typeof record.hostDeviceId !== 'string') return null;
   const hostDeviceId = parseDeviceId(record.hostDeviceId);
   if (!hostDeviceId) return null;
-  return { roomId: record.roomId, hostDeviceId };
+  const { reason } = record;
+  if (reason !== undefined && reason !== 'declined' && reason !== 'invalid-token') return null;
+  const decision: ConnectionDecisionPayload = { roomId: record.roomId, hostDeviceId };
+  if (reason === 'declined' || reason === 'invalid-token') decision.reason = reason;
+  return decision;
 }
 
 function parsePeerDisconnected(value: unknown): PeerDisconnectedPayload | null {

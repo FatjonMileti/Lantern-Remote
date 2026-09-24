@@ -30,8 +30,24 @@
 - The 9-digit device ID (`482 913 742` format) is an **identifier, not a secret**.
 - It is generated with `crypto.randomInt` and persisted under `userData`
   (never a MAC address or other hardware identifier).
-- Phase 8 adds: cryptographically random temporary password
-  (`crypto.randomInt`, never `Math.random`), expiry, plus host approval.
+- Every session additionally requires a temporary connection code plus host
+  approval (device ID + code + Accept, all three).
+
+## Connection codes (Phase 8)
+
+- 6 characters from an unambiguous alphabet (no 0/O, 1/I/L), generated with
+  `crypto.randomInt`, compared in constant time (`timingSafeEqual`).
+- 10-minute expiry, single-use (burned the moment an Accept authorizes a
+  session), revoked on session teardown, never persisted — a restart wipes them.
+- The host validates the presented code **before** showing any Accept/Reject
+  UI; wrong codes are auto-rejected with `invalid-token` and counted, so
+  guessing attempts are visible.
+- Codes travel opaquely through the signaling server (shape-checked only —
+  the server never holds a live code). A compromised server could still
+  harvest a presented code, which is why expiry is short and use is single;
+  production deployments should add authenticated device registration.
+- The human carries the code out-of-band (host screen → client keyboard),
+  like a pairing PIN; the client never stores it beyond the typed field.
 - Future production deployments should add authenticated device registration
   and TURN credentials; some NAT environments will require TURN infrastructure.
 

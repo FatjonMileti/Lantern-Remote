@@ -5,9 +5,9 @@ A portfolio-quality project demonstrating real-time communication, desktop captu
 and secure Electron architecture. Inspired by the _architecture_ of tools like
 AnyDesk/TeamViewer — no branding, proprietary UI, or code is copied.
 
-> **Phase 7 status:** remote keyboard is live — focus-keyed capture with
-> held-key flush, whitelisted `code` protocol, xdotool/cliclick backends.
-> Connection tokens (Phase 8) are not yet implemented.
+> **Phase 8 status:** connection codes required — 6-character single-use
+> expiring codes validated by the host before any modal, wrong codes
+> auto-rejected and counted. Clipboard sync (Phase 9) is not yet implemented.
 
 ## Architecture
 
@@ -111,15 +111,14 @@ See `SECURITY.md`. Key points:
 - WebRTC media/DataChannels are encrypted; signaling carries no video.
 - Device ID is persisted under `app.getPath('userData')`, never a MAC address.
 
-## Known limitations (Phase 7)
+## Known limitations (Phase 8)
 
+- Codes travel opaquely through the signaling server (shape-checked only),
+  so a compromised server could harvest a live code — bounded by 10-minute
+  expiry + single-use burn. Production needs authenticated registration.
 - Linux/X11 host input works via xdotool (mouse + keyboard); macOS via
   cliclick (mouse: move/left/right-click; keyboard: modifiers + listed
-  special keys — letters and wheel have no cliclick equivalent).
-  Wayland sessions need ydotool instead (planned).
-- Keyboard capture needs the video focused (click it, KEYS chip shows);
-  browser-reserved chords (Ctrl+W etc.) still act locally.
-- Windows adapters still report unsupported until native backends land.
+  special keys). Wayland needs ydotool (planned); Windows is stubbed.
 - Keyboard events arrive in Phase 7; clipboard in Phase 9.
 - No ICE retry on `disconnected`; a failed peer tears the session down.
 - Temporary connection tokens arrive in Phase 8.
@@ -128,5 +127,5 @@ See `SECURITY.md`. Key points:
 
 ## Roadmap
 
-Phases 8–12 per spec: tokens →
+Phases 9–12 per spec: clipboard →
 keyboard → auth tokens → clipboard → settings/logging → tests → polish.

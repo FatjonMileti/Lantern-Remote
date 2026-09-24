@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { ConnectionTokenInfo } from '../shared/connectionToken.js';
 import { IPC_CHANNELS, type AppInfo, type DesktopSource } from '../shared/ipc.js';
 import type { InputAdapterStatus, RemoteInputRequest } from '../shared/remoteInput.js';
 
@@ -19,6 +20,16 @@ const lanternApi = {
     ipcRenderer.send(IPC_CHANNELS.REMOTE_INPUT, request),
   getRemoteInputStatus: (): Promise<InputAdapterStatus> =>
     ipcRenderer.invoke(IPC_CHANNELS.GET_REMOTE_INPUT_STATUS),
+  getConnectionToken: (): Promise<ConnectionTokenInfo> =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_CONNECTION_TOKEN),
+  regenerateConnectionToken: (): Promise<ConnectionTokenInfo> =>
+    ipcRenderer.invoke(IPC_CHANNELS.REGENERATE_CONNECTION_TOKEN),
+  validateConnectionToken: (code: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.VALIDATE_CONNECTION_TOKEN, code),
+  consumeConnectionToken: (): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.CONSUME_CONNECTION_TOKEN),
+  clearConnectionToken: (): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.CLEAR_CONNECTION_TOKEN),
 };
 
 export type LanternApiType = typeof lanternApi;

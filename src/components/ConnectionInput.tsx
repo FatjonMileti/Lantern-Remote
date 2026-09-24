@@ -1,27 +1,34 @@
+import { isValidTokenFormat, normalizeTokenInput } from '../../shared/connectionToken.js';
+
 interface ConnectionInputProps {
   remoteId: string;
+  tokenInput: string;
   status: string;
   signalingConnected: boolean;
   error: string | null;
   onRemoteIdChange: (value: string) => void;
+  onTokenChange: (value: string) => void;
   onConnect: () => void;
   onDisconnect: () => void;
 }
 
 const BUSY_STATES = new Set(['connecting', 'waiting-for-approval', 'approved', 'negotiating', 'connected']);
 
-/** Remote-id entry. Connection requests go through the session hook. */
+/** Remote-id + connection-code entry. Requests go through the session hook. */
 export function ConnectionInput({
   remoteId,
+  tokenInput,
   status,
   signalingConnected,
   error,
   onRemoteIdChange,
+  onTokenChange,
   onConnect,
   onDisconnect,
 }: ConnectionInputProps) {
   const busy = BUSY_STATES.has(status);
-  const canConnect = signalingConnected && !busy && remoteId.trim().length > 0;
+  const canConnect =
+    signalingConnected && !busy && remoteId.trim().length > 0 && isValidTokenFormat(tokenInput);
 
   return (
     <section className="card" aria-label="Connect to remote device">
@@ -34,6 +41,19 @@ export function ConnectionInput({
           value={remoteId}
           onChange={(e) => onRemoteIdChange(formatInput(e.target.value))}
           aria-label="Remote ID"
+          disabled={busy}
+        />
+        <input
+          type="text"
+          className="token-input"
+          placeholder="Code"
+          autoComplete="off"
+          autoCapitalize="characters"
+          spellCheck={false}
+          maxLength={6}
+          value={tokenInput}
+          onChange={(e) => onTokenChange(normalizeTokenInput(e.target.value))}
+          aria-label="Connection code"
           disabled={busy}
         />
         {busy ? (
@@ -49,7 +69,7 @@ export function ConnectionInput({
       {error && <p className="error">{error}</p>}
       <p className="hint">
         Signaling: <strong>{signalingConnected ? 'online' : 'offline'}</strong> · Status:{' '}
-        <strong>{status}</strong>
+        <strong>{status}</strong> · Ask the host for their 6-character code.
       </p>
     </section>
   );

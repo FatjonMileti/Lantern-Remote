@@ -1,11 +1,13 @@
 import { ConnectionInput } from '../components/ConnectionInput.js';
 import { ConnectionStatus } from '../components/ConnectionStatus.js';
+import { ConnectionTokenCard } from '../components/ConnectionTokenCard.js';
 import { DeviceIdCard } from '../components/DeviceIdCard.js';
 import { IncomingRequestModal } from '../components/IncomingRequestModal.js';
 import { RecentConnections } from '../components/RecentConnections.js';
 import { RemoteDesktopViewer } from '../components/RemoteDesktopViewer.js';
 import { ScreenShareControls } from '../components/ScreenShareControls.js';
 import { SettingsPanel } from '../components/SettingsPanel.js';
+import { useConnectionToken } from '../hooks/useConnectionToken.js';
 import { useScreenShare } from '../hooks/useScreenShare.js';
 import { useSignalingSession } from '../hooks/useSignalingSession.js';
 import { useConnectionStore } from '../stores/connectionStore.js';
@@ -28,6 +30,8 @@ export function HomePage() {
   } = useScreenShare();
   const remoteId = useConnectionStore((s) => s.remoteId);
   const setRemoteId = useConnectionStore((s) => s.setRemoteId);
+  const tokenInput = useConnectionStore((s) => s.tokenInput);
+  const setTokenInput = useConnectionStore((s) => s.setTokenInput);
   const status = useConnectionStore((s) => s.status);
   const error = useConnectionStore((s) => s.error);
   const signalingConnected = useConnectionStore((s) => s.signalingConnected);
@@ -35,6 +39,14 @@ export function HomePage() {
   const remoteStream = useConnectionStore((s) => s.remoteStream);
   const fullscreen = useConnectionStore((s) => s.fullscreen);
   const setFullscreen = useConnectionStore((s) => s.setFullscreen);
+  const {
+    code: tokenCode,
+    remainingMs,
+    blockedAttempts,
+    ensure: ensureToken,
+    regenerate: regenerateToken,
+    revoke: revokeToken,
+  } = useConnectionToken();
 
   return (
     <main className="layout">
@@ -44,12 +56,22 @@ export function HomePage() {
       </header>
       <div className="grid">
         <DeviceIdCard />
+        <ConnectionTokenCard
+          code={tokenCode}
+          remainingMs={remainingMs}
+          blockedAttempts={blockedAttempts}
+          onEnsure={ensureToken}
+          onRegenerate={regenerateToken}
+          onRevoke={revokeToken}
+        />
         <ConnectionInput
           remoteId={remoteId}
+          tokenInput={tokenInput}
           status={status}
           signalingConnected={signalingConnected}
           error={error}
           onRemoteIdChange={setRemoteId}
+          onTokenChange={setTokenInput}
           onConnect={() => void connectToRemote()}
           onDisconnect={() => void disconnectSession()}
         />
@@ -76,7 +98,7 @@ export function HomePage() {
         <SettingsPanel />
       </div>
       <footer className="footer">
-        <span>Phase 5 — RemoteDesktopViewer is live. Remote input arrives in Phases 6–7.</span>
+        <span>Phase 8 — connection codes required. Clipboard sync arrives in Phase 9.</span>
       </footer>
       {incoming && (
         <IncomingRequestModal

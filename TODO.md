@@ -197,7 +197,7 @@ Windows backend (nut.js vs PowerShell helper decision).
 
 ---
 
-## Phase 7 — Remote keyboard control — DONE (uncommitted)
+## Phase 7 — Remote keyboard control — DONE
 
 **Goal:** client keystrokes reach host via DataChannel.
 
@@ -223,25 +223,38 @@ NOT verified headless: real typing host↔client — manual run: connect →
 share → click video (KEYS chip) → type → host app receives; Alt+Tab away →
 no stuck keys.
 
-**Commit:** `feat: add remote keyboard control` (pending)
+**Commit:** `feat: add remote keyboard control`
 
 ---
 
-## Phase 8 — Connection approval + temporary tokens
+## Phase 8 — Connection approval + temporary tokens — DONE (uncommitted)
 
 **Goal:** device ID + expiring token + host approval required for every session.
 
-- [ ] Token service: `crypto.randomInt` (never `Math.random`), e.g. 6-char code,
-      short expiry, single-use, revocable on disconnect.
-- [ ] Client must present token with `connection-request`; host validates
-      before showing Accept/Reject.
-- [ ] Host can regenerate/cancel token; UI shows expiry state.
-- [ ] Document model in `SECURITY.md`.
+- [x] `ConnectionTokenService` (main, in-memory only): 6-char codes from an
+      unambiguous alphabet via `crypto.randomInt` (never `Math.random`),
+      10-minute TTL, single-use (burned on accept), revoked on teardown,
+      constant-time compare, injectable clock for tests. Never persisted.
+- [x] Client presents code with `connection-request` (format-checked locally,
+      shape-checked by server); host validates **before** any modal — wrong
+      codes auto-reject with `invalid-token` (relayed reason, new error
+      message) and increment a visible blocked-attempts counter. Server never
+      holds a live code (documented harvest bound in SECURITY.md).
+- [x] Host card: Generate / New code / Revoke, live countdown, expiry
+      auto-clears; client field normalizes typing (uppercase, alphabet-only).
+- [x] Model documented in `SECURITY.md` (out-of-band carry, burn-on-accept,
+      server-harvest bound, production registration follow-up).
 
-**Verify:** connect without/with wrong/expired token fails; correct token +
-Accept connects; token expires as configured.
+**Verify:** `typecheck` ✅, `lint` ✅, format/service/parser checks 22/22 ✅
+(lifecycle incl. expiry rotation + consume, reject-reason defaults), token
+routing 8/8 ✅ (missing/malformed rejected, opaque passthrough, reason
+relayed, bogus reason rejected), boot clean ✅.
+NOT verified headless: full human flow — manual run: host Generate → client
+types ID + wrong code → blocked count rises, no modal; right code → modal →
+Accept → code burned (Generate needed for next session); wait 10 min →
+expired rejects.
 
-**Commit:** `feat: add connection authentication`
+**Commit:** `feat: add connection authentication` (pending)
 
 ---
 

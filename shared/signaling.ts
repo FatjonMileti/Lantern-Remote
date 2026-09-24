@@ -5,6 +5,7 @@
  * messages. Never trust a remote payload; always parse `unknown`.
  */
 
+import { isValidTokenFormat } from './connectionToken.js';
 import { parseDeviceId } from './deviceId.js';
 
 export const SIGNALING_EVENTS = {
@@ -36,7 +37,8 @@ export type SignalingErrorCode =
   | 'ALREADY_IN_SESSION'
   | 'NOT_REGISTERED'
   | 'NEGOTIATION_TIMEOUT'
-  | 'ICE_FAILED';
+  | 'ICE_FAILED'
+  | 'INVALID_TOKEN';
 
 export const SIGNALING_ERROR_MESSAGES: Record<SignalingErrorCode, string> = {
   SERVER_UNAVAILABLE:
@@ -52,6 +54,7 @@ export const SIGNALING_ERROR_MESSAGES: Record<SignalingErrorCode, string> = {
   NOT_REGISTERED: 'This device is not registered with the signaling server.',
   NEGOTIATION_TIMEOUT: 'The peer did not complete WebRTC negotiation in time.',
   ICE_FAILED: 'Could not establish a direct peer connection (ICE failed).',
+  INVALID_TOKEN: 'Incorrect or expired connection code. Ask the host for a fresh one.',
 };
 
 export function signalingError(
@@ -66,6 +69,8 @@ export interface RegisterDevicePayload {
 
 export interface ConnectionRequestPayload {
   targetDeviceId: string;
+  /** Connection code; server checks shape only, the host checks value. */
+  token: string;
 }
 
 export interface RoomActionPayload {
@@ -75,12 +80,20 @@ export interface RoomActionPayload {
 export interface IncomingConnectionPayload {
   roomId: string;
   fromDeviceId: string;
+  token: string;
 }
 
 export interface ConnectionDecisionPayload {
   roomId: string;
   hostDeviceId: string;
+  /** Present on rejections only; acceptances omit it. */
+  reason?: ConnectionRejectionReason;
 }
+
+/** Why a request was refused. The server relays the host's verdict. */
+export type ConnectionRejectionReason = 'declined' | 'invalid-token';
+
+const REJECTION_REASONS: ReadonlySet<string> = new Set(['declined', 'invalid-token']);
 
 export interface PeerDisconnectedPayload {
   roomId: string;
@@ -147,7 +160,9 @@ export function parseConnectionRequestPayload(value: unknown): ConnectionRequest
   if (!raw) return null;
   const targetDeviceId = parseDeviceId(raw);
   if (!targetDeviceId) return null;
-  return { targetDeviceId };
+  const token = readString(record, 'token');
+  if (!token || !isValidTokenFormat(token)) return null;
+  return { targetDeviceId, token };
 }
 
 export function parseRoomActionPayload(value: unknown): RoomActionPayload | null {
@@ -156,6 +171,19 @@ export function parseRoomActionPayload(value: unknown): RoomActionPayload | null
   const roomId = readString(record, 'roomId');
   if (!roomId || roomId.length < 8 || roomId.length > 80) return null;
   return { roomId };
+}
+
+/** Host refusal: room plus a whitelisted reason (defaults to `declined`). */
+export function parseRejectionPayload(
+  value: unknown,
+): { roomId: string; reason: ConnectionRejectionReason } | null {
+  const room = parseRoomActionPayload(value);
+  if (!room) return null;
+  const record = asRecord(value);
+  const reason = record?.reason;
+  if (reason === undefined) return { roomId: room.roomId, reason: 'declined' };
+  if (typeof reason !== 'string' || !REJECTION_REASONS.has(reason)) return null;
+  return { roomId: room.roomId, reason: reason as ConnectionRejectionReason };
 }
 
 export function parseSessionPayload(

@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../shared/ipc.js';
+import { ConnectionTokenService } from '../services/ConnectionTokenService.js';
 import { DesktopSourcesService } from '../services/DesktopSourcesService.js';
 import { DeviceIdentityService } from '../services/DeviceIdentityService.js';
 import { Logger } from '../services/Logger.js';
@@ -16,6 +17,7 @@ export function registerIpcHandlers(
   deviceIdentity: DeviceIdentityService,
   desktopSources: DesktopSourcesService,
   remoteInput: RemoteInputService,
+  connectionToken: ConnectionTokenService,
 ): void {
   ipcMain.handle(IPC_CHANNELS.GET_APP_INFO, () => {
     return {
@@ -59,6 +61,31 @@ export function registerIpcHandlers(
 
   ipcMain.handle(IPC_CHANNELS.GET_REMOTE_INPUT_STATUS, () => {
     return remoteInput.status();
+  });
+
+  // Connection codes: main owns validity; only outcomes cross IPC, and only
+  // the local host UI ever displays a live code. Validation outcomes log the
+  // verdict, never the presented code.
+  ipcMain.handle(IPC_CHANNELS.GET_CONNECTION_TOKEN, () => {
+    return connectionToken.getOrCreate();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.REGENERATE_CONNECTION_TOKEN, () => {
+    return connectionToken.regenerate();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.VALIDATE_CONNECTION_TOKEN, (_event, code: unknown) => {
+    const valid = connectionToken.validate(code);
+    if (!valid) logger.warn('Connection code validation failed');
+    return valid;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.CONSUME_CONNECTION_TOKEN, () => {
+    return connectionToken.consume();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.CLEAR_CONNECTION_TOKEN, () => {
+    connectionToken.clear();
   });
 
   logger.info('IPC handlers registered');

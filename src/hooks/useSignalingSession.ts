@@ -6,6 +6,11 @@ import { NEGOTIATION_TIMEOUT_MS, SIGNALING_ERROR_MESSAGES } from '../../shared/s
 import { remoteInputService } from '../services/RemoteInputService.js';
 import { signalingService } from '../services/SignalingService.js';
 import { webrtcService } from '../services/WebRTCService.js';
+import {
+  clearConnectionToken,
+  consumeConnectionToken,
+  validateConnectionToken,
+} from '../services/lanternBridge.js';
 import { useConnectionStore } from '../stores/connectionStore.js';
 import { useDeviceStore } from '../stores/deviceStore.js';
 import { stopLocalCapture } from './useScreenShare.js';
@@ -35,14 +40,16 @@ function armNegotiationTimer(): void {
 }
 
 /**
- * Tear down a dead session: stop capture, close the peer connection, release
- * the server room (the peer sees `peer-disconnected`), surface a human error.
+ * Tear down a dead session: stop capture, revoke the connection code,
+ * close the peer connection, release the server room (the peer sees
+ * `peer-disconnected`), surface a human error.
  */
 function failSession(message: string): void {
   clearNegotiationTimer();
   const store = useConnectionStore.getState();
   const roomId = store.roomId;
   stopLocalCapture();
+  revokeToken();
   webrtcService.close();
   void signalingService.disconnectSession(roomId).catch(() => {
     // Local reset is required even if the server is already gone.
@@ -50,6 +57,13 @@ function failSession(message: string): void {
   store.reset();
   store.setStatus('failed');
   store.setError(message);
+}
+
+/** Best-effort revocation — teardown must never hang on IPC. */
+function revokeToken(): void {
+  void clearConnectionToken().catch(() => {
+    // Local state is already cleared; a stale code simply expires.
+  });
 }
 
 /**
@@ -167,14 +181,35 @@ export function useSignalingSession(): {
         store.setError(message);
       },
       onIncoming: (payload) => {
-        const store = useConnectionStore.getState();
-        store.setIncoming({
-          roomId: payload.roomId,
-          fromDeviceId: formatDeviceId(payload.fromDeviceId),
-        });
-        store.setRoomId(payload.roomId);
-        store.setRole('host');
-        store.setStatus('waiting-for-approval');
+        // Validate the presented code BEFORE showing anything: wrong codes
+        // are auto-rejected with `invalid-token` and counted, never modal'd.
+        void (async () => {
+          const store = useConnectionStore.getState();
+          let valid = false;
+          try {
+            valid = await validateConnectionToken(payload.token);
+          } catch {
+            valid = false;
+          }
+          if (!valid) {
+            store.incrementBlockedAttempts();
+            try {
+              await signalingService.reject(payload.roomId, 'invalid-token');
+            } catch {
+              // Room is gone or server unreachable; nothing left to clean.
+            }
+            return;
+          }
+          const current = useConnectionStore.getState();
+          current.setIncoming({
+            roomId: payload.roomId,
+            fromDeviceId: formatDeviceId(payload.fromDeviceId),
+            token: payload.token,
+          });
+          current.setRoomId(payload.roomId);
+          current.setRole('host');
+          current.setStatus('waiting-for-approval');
+        })();
       },
       onAccepted: (payload) => {
         const store = useConnectionStore.getState();
@@ -183,9 +218,13 @@ export function useSignalingSession(): {
         store.setError(null);
         void createAndSendOffer(payload.roomId);
       },
-      onRejected: () => {
+      onRejected: (payload) => {
         const store = useConnectionStore.getState();
-        store.setError(SIGNALING_ERROR_MESSAGES.REJECTED);
+        store.setError(
+          payload.reason === 'invalid-token'
+            ? SIGNALING_ERROR_MESSAGES.INVALID_TOKEN
+            : SIGNALING_ERROR_MESSAGES.REJECTED,
+        );
         store.setStatus('failed');
         store.setIncoming(null);
         store.setRoomId(null);
@@ -247,7 +286,7 @@ export function useSignalingSession(): {
     store.setRole('client');
     store.setStatus('connecting');
     try {
-      const roomId = await signalingService.requestConnection(store.remoteId);
+      const roomId = await signalingService.requestConnection(store.remoteId, store.tokenInput);
       store.setRoomId(roomId);
       store.setStatus('waiting-for-approval');
     } catch (error) {
@@ -263,6 +302,10 @@ export function useSignalingSession(): {
     if (!incoming) return;
     try {
       await signalingService.accept(incoming.roomId);
+      // Single-use: burn the code the moment it authorizes a session, and
+      // drop it from the UI so it cannot be read over anyone's shoulder.
+      await consumeConnectionToken().catch(() => undefined);
+      store.setToken(null, null);
       store.setIncoming(null);
       store.setStatus('negotiating');
       store.setError(null);
@@ -295,6 +338,7 @@ export function useSignalingSession(): {
   async function disconnectSession(): Promise<void> {
     const store = useConnectionStore.getState();
     stopLocalCapture();
+    revokeToken();
     webrtcService.close();
     clearNegotiationTimer();
     try {

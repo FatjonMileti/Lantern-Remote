@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron';
 import started from 'electron-squirrel-startup';
 import { registerIpcHandlers } from './main/ipc.js';
 import { createMainWindow } from './main/window.js';
+import { ConnectionTokenService } from './services/ConnectionTokenService.js';
 import { DesktopSourcesService } from './services/DesktopSourcesService.js';
 import { DeviceIdentityService } from './services/DeviceIdentityService.js';
 import { Logger } from './services/Logger.js';
@@ -22,8 +23,9 @@ if (customUserData) {
 const deviceIdentity = new DeviceIdentityService();
 const desktopSources = new DesktopSourcesService();
 const remoteInput = new RemoteInputService();
+const connectionToken = new ConnectionTokenService();
 
-registerIpcHandlers(deviceIdentity, desktopSources, remoteInput);
+registerIpcHandlers(deviceIdentity, desktopSources, remoteInput, connectionToken);
 
 const allowMultiInstance =
   process.env.LANTERN_ALLOW_MULTI_INSTANCE === '1' || Boolean(customUserData);
