@@ -304,7 +304,10 @@ function parsePeerDisconnected(value: unknown): PeerDisconnectedPayload | null {
 }
 
 /** Re-validate relayed SDP: the server forwards but never vouches for content. */
-function parseSessionPayload(value: unknown, expectedType: 'offer' | 'answer'): WebRTCSessionPayload | null {
+function parseSessionPayload(
+  value: unknown,
+  expectedType: 'offer' | 'answer',
+): WebRTCSessionPayload | null {
   if (typeof value !== 'object' || value === null) return null;
   const record = value as Record<string, unknown>;
   if (typeof record.roomId !== 'string' || typeof record.sdp !== 'string') return null;
@@ -322,7 +325,15 @@ function parseIcePayload(value: unknown): IceCandidatePayload | null {
   }
   const { sdpMid, sdpMLineIndex } = record;
   if (sdpMid !== null && typeof sdpMid !== 'string') return null;
-  if (sdpMLineIndex !== null && typeof sdpMLineIndex !== 'number') return null;
+  if (
+    sdpMLineIndex !== null &&
+    (typeof sdpMLineIndex !== 'number' ||
+      !Number.isFinite(sdpMLineIndex) ||
+      !Number.isInteger(sdpMLineIndex) ||
+      sdpMLineIndex < 0)
+  ) {
+    return null;
+  }
   return { roomId: record.roomId, candidate: record.candidate, sdpMid, sdpMLineIndex };
 }
 

@@ -57,9 +57,10 @@ export const SIGNALING_ERROR_MESSAGES: Record<SignalingErrorCode, string> = {
   INVALID_TOKEN: 'Incorrect or expired connection code. Ask the host for a fresh one.',
 };
 
-export function signalingError(
-  code: SignalingErrorCode,
-): { code: SignalingErrorCode; message: string } {
+export function signalingError(code: SignalingErrorCode): {
+  code: SignalingErrorCode;
+  message: string;
+} {
   return { code, message: SIGNALING_ERROR_MESSAGES[code] };
 }
 
@@ -211,6 +212,14 @@ export function parseIceCandidatePayload(value: unknown): IceCandidatePayload | 
   const sdpMid = record.sdpMid;
   const sdpMLineIndex = record.sdpMLineIndex;
   if (sdpMid !== null && typeof sdpMid !== 'string') return null;
-  if (sdpMLineIndex !== null && typeof sdpMLineIndex !== 'number') return null;
+  if (
+    sdpMLineIndex !== null &&
+    (typeof sdpMLineIndex !== 'number' ||
+      !Number.isFinite(sdpMLineIndex) ||
+      !Number.isInteger(sdpMLineIndex) ||
+      sdpMLineIndex < 0)
+  ) {
+    return null;
+  }
   return { roomId: room.roomId, candidate, sdpMid, sdpMLineIndex };
 }

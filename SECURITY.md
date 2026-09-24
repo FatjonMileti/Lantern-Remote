@@ -18,14 +18,15 @@
 ## Consent
 
 - No silent access: the host must explicitly Accept each incoming request.
-- Screen sharing must be explicitly started by the host user (Phase 4).
+- Screen sharing must be explicitly started by the host user — connecting
+  alone never shows a pixel; capture starts only on Start sharing.
 - Remote input flows only inside an accepted, actively sharing session, and
-  only whitelisted message kinds are processed (Phase 6). OS backends will
-  additionally require explicit OS-level permission (uinput group /
-  Accessibility approval) when they land.
-- Clipboard sync defaults to OFF and is text-only (Phase 9).
+  only whitelisted message kinds are processed. OS backends additionally
+  require explicit OS-level permission (Linux: X11 access/xdotool present;
+  macOS: Accessibility approval for the app).
+- Clipboard sync defaults to OFF and is text-only.
 
-## Clipboard sync (Phase 9)
+## Clipboard sync
 
 - Opt-in on **both** ends independently: each side polls its local clipboard
   only while its own setting is on _and_ the session is connected. OFF blocks
@@ -47,8 +48,11 @@
   (never a MAC address or other hardware identifier).
 - Every session additionally requires a temporary connection code plus host
   approval (device ID + code + Accept, all three).
+- Unexpected WebRTC, signaling, peer, and explicit disconnects share one local
+  teardown path that stops capture, clears temporary codes, closes the peer, and
+  releases the signaling room.
 
-## Connection codes (Phase 8)
+## Connection codes
 
 - 6 characters from an unambiguous alphabet (no 0/O, 1/I/L), generated with
   `crypto.randomInt`, compared in constant time (`timingSafeEqual`).
@@ -63,8 +67,16 @@
   production deployments should add authenticated device registration.
 - The human carries the code out-of-band (host screen → client keyboard),
   like a pairing PIN; the client never stores it beyond the typed field.
-- Future production deployments should add authenticated device registration
-  and TURN credentials; some NAT environments will require TURN infrastructure.
+
+## Production hardening (not yet implemented)
+
+- Authenticated device registration (the signaling server currently trusts
+  self-asserted device IDs).
+- TURN credentials for restrictive NATs; the default config is STUN-only.
+- File transfer remains types-only (`shared/fileTransfer.ts`) — no
+  implementation until core is stable.
+- Production transport hardening: TLS, restricted Socket.IO origins, and
+  registration/request rate limiting.
 
 ## Logging hygiene
 

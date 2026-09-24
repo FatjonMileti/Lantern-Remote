@@ -346,20 +346,32 @@ clipboard read/write — manual two-instance runs per earlier phases.
 
 ---
 
-## Phase 12 — Polish + documentation
+## Phase 12 — Polish + documentation — DONE
 
 **Goal:** publishable portfolio project.
 
-- [ ] UI polish: consistent dark theme, empty/error states, no excessive animation.
-- [ ] README: full architecture, process model, WebRTC/signaling design,
-      setup, builds, security summary, limitations, roadmap, Mermaid diagrams.
-- [ ] `SECURITY.md` final review; `.env.example` complete.
-- [ ] File-transfer **types/interfaces only** (chunking, progress,
-      cancellation, integrity) for a future `file-transfer` DataChannel —
-      no implementation until core is stable.
-- [ ] Final `typecheck` + `lint` + `package`/`make` smoke test.
+- [x] UI polish: theme consolidated on CSS variables (`--panel-deep`, `--ok`,
+      `--danger` — single `.button-secondary`, no hardcoded repeats), button
+      hover + `focus-visible` rings, input/select focus borders, checkbox
+      accent, all 8 session states colored in Diagnostics, `.error`
+      word-break. Empty states already present (recent/history placeholder,
+      viewer placeholder, "No displays found", pre-share hint); errors render
+      inline per card. No animation beyond 0.1s button transitions.
+      Stale copy fixed (DeviceIdCard "Phase 8" hint, phase-stamped footer).
+- [x] README rewritten: features, architecture + session-flow Mermaid diagrams,
+      channel table, process model + codebase rules, setup/two-instance env,
+      host backends, security summary, limitations, roadmap.
+- [x] `SECURITY.md` final review: consent section corrected to shipped
+      behavior, phase stamps removed, production-hardening section added.
+      `.env.example` fixed (dropped misleading server-side `STUN_SERVERS`).
+- [x] File-transfer **types/interfaces only** — `shared/fileTransfer.ts`:
+      offer/chunk/cancel/complete, 16 KiB chunks, 64 MiB cap, SHA-256
+      integrity-before-trust, bare-filename rule, progress shape. Zero
+      functions, zero implementation.
+- [x] Final `typecheck` + `lint` + `package` smoke test.
 
-**Verify:** clean install → `npm run start` works; `npm run package` succeeds.
+**Verify:** `typecheck` ✅, `lint` ✅, `test:run` **170/170** ✅, Prettier ✅,
+`npm run package` ✅ (`out/Lantern Remote-linux-x64`), boot clean ✅.
 
 **Commit:** `docs: add architecture and security documentation`
 

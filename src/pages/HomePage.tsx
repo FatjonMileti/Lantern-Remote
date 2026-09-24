@@ -107,7 +107,10 @@ export function HomePage() {
         <SettingsPanel clipboardActive={clipboardActive} />
       </div>
       <footer className="footer">
-        <span>Phase 10 — settings, logging, diagnostics, and connection history.</span>
+        <span>
+          Every session needs your explicit Accept. Clipboard sync is opt-in (Settings, off by
+          default).
+        </span>
       </footer>
       {incoming && (
         <IncomingRequestModal

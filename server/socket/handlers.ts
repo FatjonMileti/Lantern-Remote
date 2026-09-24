@@ -36,6 +36,23 @@ export function registerSocketHandlers(
       ackErr(ack, 'INVALID_ID');
       return;
     }
+    const previous = registry.getSocket(payload.deviceId);
+    const existingRoom = rooms.getByDevice(payload.deviceId);
+    if (previous && previous.id !== socket.id && existingRoom) {
+      rooms.remove(existingRoom.id);
+      previous.emit(SIGNALING_EVENTS.PEER_DISCONNECTED, {
+        roomId: existingRoom.id,
+        reason: 'offline',
+      });
+      const peerDeviceId =
+        existingRoom.clientDeviceId === payload.deviceId
+          ? existingRoom.hostDeviceId
+          : existingRoom.clientDeviceId;
+      registry.getSocket(peerDeviceId)?.emit(SIGNALING_EVENTS.PEER_DISCONNECTED, {
+        roomId: existingRoom.id,
+        reason: 'offline',
+      });
+    }
     const displaced = registry.register(payload.deviceId, socket);
     if (displaced) {
       displaced.disconnect(true);
@@ -152,32 +169,29 @@ export function registerSocketHandlers(
     },
   );
 
-  socket.on(
-    SIGNALING_EVENTS.DISCONNECT_DEVICE,
-    (raw: unknown, ack?: (r: SignalingAck) => void) => {
-      const deviceId = registry.getDeviceId(socket.id);
-      if (!deviceId) {
-        ackErr(ack, 'NOT_REGISTERED');
-        return;
-      }
-      const payload = parseRoomActionPayload(raw);
-      const room = payload ? rooms.get(payload.roomId) : rooms.getByDevice(deviceId);
-      if (!room) {
-        ackErr(ack, 'ROOM_NOT_FOUND');
-        return;
-      }
-      if (room.clientDeviceId !== deviceId && room.hostDeviceId !== deviceId) {
-        ackErr(ack, 'UNAUTHORIZED');
-        return;
-      }
-      rooms.remove(room.id);
-      io.to(room.id).emit(SIGNALING_EVENTS.PEER_DISCONNECTED, {
-        roomId: room.id,
-        reason: 'left',
-      });
-      ackOk(ack, room.id);
-    },
-  );
+  socket.on(SIGNALING_EVENTS.DISCONNECT_DEVICE, (raw: unknown, ack?: (r: SignalingAck) => void) => {
+    const deviceId = registry.getDeviceId(socket.id);
+    if (!deviceId) {
+      ackErr(ack, 'NOT_REGISTERED');
+      return;
+    }
+    const payload = parseRoomActionPayload(raw);
+    const room = payload ? rooms.get(payload.roomId) : rooms.getByDevice(deviceId);
+    if (!room) {
+      ackErr(ack, 'ROOM_NOT_FOUND');
+      return;
+    }
+    if (room.clientDeviceId !== deviceId && room.hostDeviceId !== deviceId) {
+      ackErr(ack, 'UNAUTHORIZED');
+      return;
+    }
+    rooms.remove(room.id);
+    io.to(room.id).emit(SIGNALING_EVENTS.PEER_DISCONNECTED, {
+      roomId: room.id,
+      reason: 'left',
+    });
+    ackOk(ack, room.id);
+  });
 
   /**
    * WebRTC signaling relay. The server forwards SDP/ICE between the two room

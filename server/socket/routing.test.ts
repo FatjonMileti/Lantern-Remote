@@ -1,4 +1,3 @@
-
 // @vitest-environment node
 import { createServer, type Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
@@ -51,7 +50,8 @@ async function connectClient(): Promise<ClientSocket> {
 
 /** Ack carries roomId only on success — unwrap or fail loudly. */
 function roomIdOf(ack: SignalingAck): string {
-  if (!ack.ok || !ack.roomId) throw new Error(`expected ok ack with roomId: ${JSON.stringify(ack)}`);
+  if (!ack.ok || !ack.roomId)
+    throw new Error(`expected ok ack with roomId: ${JSON.stringify(ack)}`);
   return ack.roomId;
 }
 
@@ -176,6 +176,7 @@ describe('signaling routing', () => {
   it('accepts, enforces offer direction, and cleans up on disconnect', async () => {
     const client = await connectClient();
     const host = await connectClient();
+    let replacement: ClientSocket | null = null;
     try {
       await emitAck(client, SIGNALING_EVENTS.REGISTER_DEVICE, { deviceId: CLIENT_ID });
       await emitAck(host, SIGNALING_EVENTS.REGISTER_DEVICE, { deviceId: HOST_ID });
@@ -189,9 +190,7 @@ describe('signaling routing', () => {
       expect(roomIdOf(reqAck)).toBe(roomId);
 
       const acceptedP = onceEvent<{ roomId: string }>(client, SIGNALING_EVENTS.CONNECTION_ACCEPTED);
-      expect(
-        (await emitAck(host, SIGNALING_EVENTS.CONNECTION_ACCEPTED, { roomId })).ok,
-      ).toBe(true);
+      expect((await emitAck(host, SIGNALING_EVENTS.CONNECTION_ACCEPTED, { roomId })).ok).toBe(true);
       expect((await acceptedP).roomId).toBe(roomId);
 
       // Offers flow client→host only; a host-side offer is unauthorized.
@@ -216,14 +215,38 @@ describe('signaling routing', () => {
         ).ok,
       ).toBe(false);
 
+      replacement = await connectClient();
+      const replacedPeerP = onceEvent<{ roomId: string; reason: string }>(
+        client,
+        SIGNALING_EVENTS.PEER_DISCONNECTED,
+      );
+      expect(
+        (await emitAck(replacement, SIGNALING_EVENTS.REGISTER_DEVICE, { deviceId: HOST_ID })).ok,
+      ).toBe(true);
+      const replacedPeer = await replacedPeerP;
+      expect(replacedPeer.roomId).toBe(roomId);
+      expect(replacedPeer.reason).toBe('offline');
+
+      const retryIncomingP = onceEvent<{ roomId: string }>(
+        replacement,
+        SIGNALING_EVENTS.INCOMING_CONNECTION,
+      );
+      const retryAck = await emitAck(client, SIGNALING_EVENTS.CONNECTION_REQUEST, {
+        targetDeviceId: HOST_ID,
+        token: TOKEN,
+      });
+      expect(retryAck.ok).toBe(true);
+      const retryRoomId = (await retryIncomingP).roomId;
+      expect(retryRoomId).toBe(roomIdOf(retryAck));
+
       // Host disconnect notifies the client and frees both devices.
       const offlineP = onceEvent<{ roomId: string; reason: string }>(
         client,
         SIGNALING_EVENTS.PEER_DISCONNECTED,
       );
-      host.disconnect();
+      replacement.disconnect();
       const offline = await offlineP;
-      expect(offline.roomId).toBe(roomId);
+      expect(offline.roomId).toBe(retryRoomId);
       expect(offline.reason).toBe('offline');
 
       const retry = await emitAck(client, SIGNALING_EVENTS.CONNECTION_REQUEST, {
@@ -233,6 +256,7 @@ describe('signaling routing', () => {
       expect(retry.ok).toBe(false);
     } finally {
       client.disconnect();
+      replacement?.disconnect();
     }
   });
 

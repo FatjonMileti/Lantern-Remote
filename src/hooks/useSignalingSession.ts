@@ -47,7 +47,7 @@ function armNegotiationTimer(): void {
  * close the peer connection, release the server room (the peer sees
  * `peer-disconnected`), surface a human error.
  */
-function failSession(message: string): void {
+function teardownSession(status: 'failed' | 'disconnected', message: string | null): void {
   clearNegotiationTimer();
   const store = useConnectionStore.getState();
   const roomId = store.roomId;
@@ -58,8 +58,12 @@ function failSession(message: string): void {
     // Local reset is required even if the server is already gone.
   });
   store.reset();
-  store.setStatus('failed');
+  store.setStatus(status);
   store.setError(message);
+}
+
+function failSession(message: string): void {
+  teardownSession('failed', message);
 }
 
 /** Best-effort revocation — teardown must never hang on IPC. */
@@ -122,10 +126,7 @@ export function useSignalingSession(): {
         } else if (state === 'failed') {
           failSession(SIGNALING_ERROR_MESSAGES.ICE_FAILED);
         } else if (state === 'disconnected' || state === 'closed') {
-          // Transient blips also land here; reconnect arrives in Phase 4+.
-          clearNegotiationTimer();
-          webrtcService.close();
-          store.setStatus('disconnected');
+          teardownSession('disconnected', null);
         }
       },
       onIceState: (state) => {
@@ -147,7 +148,8 @@ export function useSignalingSession(): {
       onRemoteStream: (stream) => {
         useConnectionStore.getState().setRemoteStream(stream);
       },
-      onRemoteInputMessage: (data) => {        // Host path only: the client never applies input to itself. Trust
+      onRemoteInputMessage: (data) => {
+        // Host path only: the client never applies input to itself. Trust
         // comes from the channel; content is validated inside forwardToHost.
         const store = useConnectionStore.getState();
         if (store.role !== 'host' || !store.sharing) return;
@@ -185,7 +187,11 @@ export function useSignalingSession(): {
         useConnectionStore.getState().setError(null);
       },
       onDisconnected: () => {
-        useConnectionStore.getState().setSignalingConnected(false);
+        const store = useConnectionStore.getState();
+        store.setSignalingConnected(false);
+        if (store.roomId || store.status !== 'idle') {
+          teardownSession('failed', SIGNALING_ERROR_MESSAGES.SERVER_UNAVAILABLE);
+        }
       },
       onUnavailable: (message) => {
         const store = useConnectionStore.getState();
@@ -267,18 +273,11 @@ export function useSignalingSession(): {
           });
       },
       onPeerDisconnected: (payload) => {
-        const store = useConnectionStore.getState();
-        stopLocalCapture();
-        webrtcService.close();
-        clearNegotiationTimer();
         if (payload.reason === 'timeout') {
-          store.setError(SIGNALING_ERROR_MESSAGES.TIMEOUT);
-          store.setStatus('failed');
+          teardownSession('failed', SIGNALING_ERROR_MESSAGES.TIMEOUT);
         } else {
-          store.setStatus('disconnected');
+          teardownSession('disconnected', null);
         }
-        store.setIncoming(null);
-        store.setRoomId(null);
       },
     });
 
