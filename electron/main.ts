@@ -5,6 +5,7 @@ import { createMainWindow } from './main/window.js';
 import { DesktopSourcesService } from './services/DesktopSourcesService.js';
 import { DeviceIdentityService } from './services/DeviceIdentityService.js';
 import { Logger } from './services/Logger.js';
+import { RemoteInputService } from './services/RemoteInputService.js';
 
 const logger = new Logger('main');
 
@@ -20,8 +21,9 @@ if (customUserData) {
 
 const deviceIdentity = new DeviceIdentityService();
 const desktopSources = new DesktopSourcesService();
+const remoteInput = new RemoteInputService();
 
-registerIpcHandlers(deviceIdentity, desktopSources);
+registerIpcHandlers(deviceIdentity, desktopSources, remoteInput);
 
 const allowMultiInstance =
   process.env.LANTERN_ALLOW_MULTI_INSTANCE === '1' || Boolean(customUserData);

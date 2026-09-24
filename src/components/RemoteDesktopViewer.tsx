@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { remoteInputService } from '../services/RemoteInputService.js';
+import { useConnectionStore } from '../stores/connectionStore.js';
 import { ConnectionToolbar } from './ConnectionToolbar.js';
 
 interface RemoteDesktopViewerProps {
@@ -29,6 +31,10 @@ export function RemoteDesktopViewer({
   const [scaleMode, setScaleMode] = useState<'fit' | 'actual'>('fit');
   const [fps, setFps] = useState(0);
   const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
+  // Capture is client-side only: the host never drives input into itself.
+  const role = useConnectionStore((s) => s.role);
+  const sessionStatus = useConnectionStore((s) => s.status);
+  const inputActive = role === 'client' && sessionStatus === 'connected' && stream !== null;
 
   // Attach the remote stream imperatively; clear on teardown.
   useEffect(() => {
@@ -44,6 +50,16 @@ export function RemoteDesktopViewer({
       video.srcObject = null;
     };
   }, [stream]);
+
+  // Remote control: capture pointer events over the video while this client
+  // is connected. Normalization/throttle/serialization live in the service —
+  // this effect is wiring only, detached on cleanup.
+  useEffect(() => {
+    if (!inputActive) return;
+    const video = videoRef.current;
+    if (!video) return;
+    return remoteInputService.attachCapture(video);
+  }, [inputActive]);
 
   // Intrinsic size for the aspect-ratio box and overlay.
   useEffect(() => {
@@ -170,6 +186,11 @@ export function RemoteDesktopViewer({
           <span className="size-badge">
             {videoSize.width}×{videoSize.height}
           </span>
+          {inputActive && (
+            <span className="input-badge" title="Mouse input is being sent to the host">
+              INPUT
+            </span>
+          )}
         </div>
       </div>
       <ConnectionToolbar

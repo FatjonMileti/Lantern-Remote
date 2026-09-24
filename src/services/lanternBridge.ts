@@ -6,6 +6,7 @@
  * in one place instead of scattered `window` accesses.
  */
 import type { AppInfo, DesktopSource } from '../../shared/ipc.js';
+import type { InputAdapterStatus, RemoteInputRequest } from '../../shared/remoteInput.js';
 
 function bridge(): Window['lantern'] {
   if (!window.lantern) {
@@ -24,4 +25,12 @@ export function getAppInfo(): Promise<AppInfo> {
 
 export function getDesktopSources(): Promise<DesktopSource[]> {
   return bridge().getDesktopSources();
+}
+
+export function sendRemoteInput(request: RemoteInputRequest): void {
+  bridge().sendRemoteInput(request);
+}
+
+export function getRemoteInputStatus(): Promise<InputAdapterStatus> {
+  return bridge().getRemoteInputStatus();
 }

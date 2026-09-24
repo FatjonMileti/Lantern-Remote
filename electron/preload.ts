@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS, type AppInfo, type DesktopSource } from '../shared/ipc.js';
+import type { InputAdapterStatus, RemoteInputRequest } from '../shared/remoteInput.js';
 
 /**
  * Secure preload bridge.
@@ -13,6 +14,11 @@ const lanternApi = {
   getDeviceId: (): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.GET_DEVICE_ID),
   getDesktopSources: (): Promise<DesktopSource[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.GET_DESKTOP_SOURCES),
+  // Fire-and-forget by design: input events stream at tens of Hz.
+  sendRemoteInput: (request: RemoteInputRequest): void =>
+    ipcRenderer.send(IPC_CHANNELS.REMOTE_INPUT, request),
+  getRemoteInputStatus: (): Promise<InputAdapterStatus> =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_REMOTE_INPUT_STATUS),
 };
 
 export type LanternApiType = typeof lanternApi;

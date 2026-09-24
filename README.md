@@ -5,9 +5,11 @@ A portfolio-quality project demonstrating real-time communication, desktop captu
 and secure Electron architecture. Inspired by the _architecture_ of tools like
 AnyDesk/TeamViewer — no branding, proprietary UI, or code is copied.
 
-> **Phase 5 status:** RemoteDesktopViewer with fit/1:1 scaling, fullscreen,
-> FPS + resolution overlay, and toolbar (Disconnect + inert future stubs).
-> Remote input (Phases 6–7) is not yet implemented.
+> **Phase 6 status:** remote mouse data flow is complete — client captures
+> normalized pointer events over the `remote-input` DataChannel, host
+> validates, denormalizes, and dispatches to OS adapters. Adapters are honest
+> stubs (no privileged backend yet), so no cursor moves. Keyboard (Phase 7)
+> is not yet implemented.
 
 ## Architecture
 
@@ -99,9 +101,11 @@ See `SECURITY.md`. Key points:
 - WebRTC media/DataChannels are encrypted; signaling carries no video.
 - Device ID is persisted under `app.getPath('userData')`, never a MAC address.
 
-## Known limitations (Phase 5)
+## Known limitations (Phase 6)
 
-- Viewer is display-only; remote mouse/keyboard arrive in Phases 6–7.
+- Mouse events reach the host dispatcher but no OS cursor moves: Linux /
+  Windows / macOS adapters report unsupported until privileged backends land.
+- Keyboard events arrive in Phase 7; clipboard in Phase 9.
 - No ICE retry on `disconnected`; a failed peer tears the session down.
 - Temporary connection tokens arrive in Phase 8.
 - Single main window; no tray, no multi-monitor selection yet.
@@ -109,5 +113,5 @@ See `SECURITY.md`. Key points:
 
 ## Roadmap
 
-Phases 6–12 per spec: mouse →
+Phases 7–12 per spec: keyboard →
 keyboard → auth tokens → clipboard → settings/logging → tests → polish.

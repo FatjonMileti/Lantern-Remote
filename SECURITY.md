@@ -19,6 +19,10 @@
 
 - No silent access: the host must explicitly Accept each incoming request.
 - Screen sharing must be explicitly started by the host user (Phase 4).
+- Remote input flows only inside an accepted, actively sharing session, and
+  only whitelisted message kinds are processed (Phase 6). OS backends will
+  additionally require explicit OS-level permission (uinput group /
+  Accessibility approval) when they land.
 - Clipboard sync defaults to OFF and is text-only (Phase 9).
 
 ## Identity vs. authentication

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { serializeControlMessage } from '../../shared/controlMessages.js';
 import type { DesktopSource } from '../../shared/ipc.js';
+import { remoteInputService } from '../services/RemoteInputService.js';
 import { screenCaptureService } from '../services/ScreenCaptureService.js';
 import { webrtcService } from '../services/WebRTCService.js';
 import { useConnectionStore } from '../stores/connectionStore.js';
@@ -16,6 +17,14 @@ export function stopLocalCapture(): void {
   webrtcService.removeLocalStream();
   store.setLocalStream(null);
   store.setSharing(false);
+  store.setSharedDisplaySize(null);
+  store.setLastRemoteInput(null);
+}
+
+function readDisplaySize(stream: MediaStream): { width: number; height: number } | null {
+  const settings = stream.getVideoTracks()[0]?.getSettings();
+  if (!settings || !settings.width || !settings.height) return null;
+  return { width: settings.width, height: settings.height };
 }
 
 /**
@@ -91,6 +100,17 @@ export function useScreenShare(): {
     }
     store.setLocalStream(stream);
     store.setSharing(true);
+    store.setSharedDisplaySize(readDisplaySize(stream));
+    // Surface the honest adapter state now that sharing is live. Capability
+    // is queried here (not at boot) because it describes this host session.
+    remoteInputService
+      .inputStatus()
+      .then((status) => {
+        useConnectionStore.getState().setInputCapability(status.supported, status.reason);
+      })
+      .catch(() => {
+        useConnectionStore.getState().setInputCapability(false, 'Unable to query input support.');
+      });
     const notified = webrtcService.sendControlMessage(
       serializeControlMessage({ kind: 'video-tracks-added' }),
     );

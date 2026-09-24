@@ -14,6 +14,8 @@ export interface WebRTCEvents {
   onControlOpen?: () => void;
   onControlMessage?: (data: string) => void;
   onRemoteStream?: (stream: MediaStream) => void;
+  onRemoteInputOpen?: () => void;
+  onRemoteInputMessage?: (data: string) => void;
 }
 
 export interface SessionDescription {
@@ -22,6 +24,7 @@ export interface SessionDescription {
 }
 
 const CONTROL_CHANNEL_LABEL = 'control';
+const REMOTE_INPUT_CHANNEL_LABEL = 'remote-input';
 const DEFAULT_STUN_SERVERS = 'stun:stun.l.google.com:19302';
 
 /**
@@ -41,6 +44,7 @@ function buildIceServers(): RTCIceServer[] {
 export class WebRTCService {
   private pc: RTCPeerConnection | null = null;
   private controlChannel: RTCDataChannel | null = null;
+  private inputChannel: RTCDataChannel | null = null;
   private events: WebRTCEvents = {};
 
   setEvents(events: WebRTCEvents): void {
@@ -57,13 +61,15 @@ export class WebRTCService {
 
   /** Client role: create an offer after the host accepted. Reusable for re-offers. */
   async createOffer(): Promise<SessionDescription> {
-    // Fresh connection: open the `control` channel. Re-offers reuse the live
-    // peer connection (and its channel) so no renegotiation loop starts.
+    // Fresh connection: open `control` + `remote-input` channels. Re-offers
+    // reuse the live peer connection (and its channels) so no loop starts.
     const fresh = this.pc === null;
     const pc = this.ensurePeerConnection();
     if (fresh) {
       this.controlChannel = pc.createDataChannel(CONTROL_CHANNEL_LABEL);
       this.wireControlChannel(this.controlChannel);
+      this.inputChannel = pc.createDataChannel(REMOTE_INPUT_CHANNEL_LABEL);
+      this.wireInputChannel(this.inputChannel);
     }
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
@@ -137,23 +143,23 @@ export class WebRTCService {
    * queueing unbounded state.
    */
   sendControlMessage(data: string): boolean {
-    const channel = this.controlChannel;
-    if (!channel || channel.readyState !== 'open') return false;
-    try {
-      channel.send(data);
-      return true;
-    } catch {
-      return false;
-    }
+    return sendOnChannel(this.controlChannel, data);
+  }
+
+  /**
+   * Send a text frame on the `remote-input` channel (mouse in Phase 6,
+   * keyboard joins in Phase 7). Same contract as control: false when the
+   * channel is not open, so callers drop instead of queueing.
+   */
+  sendRemoteInput(data: string): boolean {
+    return sendOnChannel(this.inputChannel, data);
   }
 
   close(): void {
-    try {
-      this.controlChannel?.close();
-    } catch {
-      // Channel may already be closed; cleanup must not throw.
-    }
+    closeChannel(this.controlChannel);
+    closeChannel(this.inputChannel);
     this.controlChannel = null;
+    this.inputChannel = null;
     if (this.pc) {
       this.pc.onconnectionstatechange = null;
       this.pc.oniceconnectionstatechange = null;
@@ -193,11 +199,15 @@ export class WebRTCService {
     pc.onicecandidateerror = (event) => {
       console.warn('[webrtc] ICE candidate error', event);
     };
-    // Answerer side: the offerer's `control` channel arrives here.
+    // Answerer side: the offerer's channels arrive here, routed by label.
+    // Unknown labels are ignored — only whitelisted channels are wired.
     pc.ondatachannel = (event) => {
       if (event.channel.label === CONTROL_CHANNEL_LABEL) {
         this.controlChannel = event.channel;
         this.wireControlChannel(event.channel);
+      } else if (event.channel.label === REMOTE_INPUT_CHANNEL_LABEL) {
+        this.inputChannel = event.channel;
+        this.wireInputChannel(event.channel);
       }
     };
     pc.ontrack = (event) => {
@@ -221,11 +231,42 @@ export class WebRTCService {
     };
   }
 
+  private wireInputChannel(channel: RTCDataChannel): void {
+    channel.onopen = () => {
+      this.events.onRemoteInputOpen?.();
+    };
+    channel.onmessage = (event) => {
+      // Input channel carries text frames only; binary is rejected.
+      if (typeof event.data === 'string') {
+        this.events.onRemoteInputMessage?.(event.data);
+      }
+    };
+  }
+
   private requirePeerConnection(): RTCPeerConnection {
     if (!this.pc) {
       throw new Error('No active peer connection for this session.');
     }
     return this.pc;
+  }
+}
+
+function sendOnChannel(channel: RTCDataChannel | null, data: string): boolean {
+  if (!channel || channel.readyState !== 'open') return false;
+  try {
+    channel.send(data);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function closeChannel(channel: RTCDataChannel | null): void {
+  if (!channel) return;
+  try {
+    channel.close();
+  } catch {
+    // Channel may already be closed; cleanup must not throw.
   }
 }
 

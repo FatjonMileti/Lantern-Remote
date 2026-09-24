@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from '../../shared/ipc.js';
 import { DesktopSourcesService } from '../services/DesktopSourcesService.js';
 import { DeviceIdentityService } from '../services/DeviceIdentityService.js';
 import { Logger } from '../services/Logger.js';
+import { RemoteInputService } from '../services/RemoteInputService.js';
 
 const logger = new Logger('main:ipc');
 
@@ -14,6 +15,7 @@ const logger = new Logger('main:ipc');
 export function registerIpcHandlers(
   deviceIdentity: DeviceIdentityService,
   desktopSources: DesktopSourcesService,
+  remoteInput: RemoteInputService,
 ): void {
   ipcMain.handle(IPC_CHANNELS.GET_APP_INFO, () => {
     return {
@@ -39,6 +41,24 @@ export function registerIpcHandlers(
       logger.error('Failed to list desktop sources', error);
       throw new Error('Unable to list screens for capture');
     }
+  });
+
+  // Fire-and-forget: mouse moves arrive at tens of Hz, so no ack channel.
+  // The dispatcher re-validates; only the message kind (never coordinates
+  // or contents) is logged, per the logging hygiene rules.
+  ipcMain.on(IPC_CHANNELS.REMOTE_INPUT, (_event, raw: unknown) => {
+    void remoteInput.dispatch(raw).then((result) => {
+      if (!result.ok) {
+        logger.warn('Remote input rejected', {
+          kind: result.kind,
+          reason: result.reason,
+        });
+      }
+    });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.GET_REMOTE_INPUT_STATUS, () => {
+    return remoteInput.status();
   });
 
   logger.info('IPC handlers registered');

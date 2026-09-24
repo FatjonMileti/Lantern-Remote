@@ -230,6 +230,17 @@ select {
   font-weight: 600;
 }
 
+.input-badge {
+  background: rgba(77, 163, 255, 0.25);
+  color: #9dccff;
+  border: 1px solid #4da3ff;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-family: monospace;
+  font-weight: 600;
+}
+
 .viewer-placeholder {
   display: flex;
   flex-direction: column;

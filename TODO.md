@@ -121,7 +121,7 @@ sharing → client viewer clears. Disconnect → capture tracks stop.
 
 ---
 
-## Phase 5 — RemoteDesktopViewer UI — DONE (uncommitted)
+## Phase 5 — RemoteDesktopViewer UI — DONE
 
 **Goal:** professional viewer for the remote stream.
 
@@ -143,23 +143,44 @@ sharing → client viewer clears. Disconnect → capture tracks stop.
 NOT verified headless: real pixels + toolbar interaction need two live
 instances — same manual run as Phase 4, now checking Fit/1:1/Fullscreen/FPS.
 
-**Commit:** `feat: add remote desktop viewer` (pending)
+**Commit:** `feat: add remote desktop viewer`
 
 ---
 
-## Phase 6 — Remote mouse control
+## Phase 6 — Remote mouse control — DONE (uncommitted)
 
 **Goal:** client mouse drives host cursor via `remote-input` DataChannel.
 
-- [ ] Capture on client: mousemove, mousedown, mouseup, click,
-      double-click, wheel. Send **normalized** (0.0–1.0) coordinates, never raw pixels.
-- [ ] Create `RemoteInputService` + platform adapters
-      (`LinuxInputAdapter`, `WindowsInputAdapter`, `MacOSInputAdapter`)
-      behind a common interface. Prioritize Linux.
-- [ ] Host converts normalized → display coordinates; validates every message
-      against a typed schema (`shared/` message types).
-- [ ] Clear "remote input unavailable" state where unsupported.
-      No privileged OS input libraries until data flow is proven.
+- [x] Capture on client (`RemoteInputService.attachCapture`, wired in viewer
+      only for client role + connected): mousemove (33 ms throttle, trailing
+      latest), mousedown/up, wheel (deltaMode→pixel approx). Sends
+      **normalized** (0.0–1.0) frame coords with contain-letterboxing excluded
+      (outside-frame events dropped); right-click menu suppressed while
+      attached. `click`/`double-click` accepted by the protocol but the client
+      sends down/up pairs only — a physical click must never apply twice.
+- [x] Created renderer `RemoteInputService` + main `RemoteInputService`
+      dispatcher + `RemoteInputAdapter` interface with `LinuxInputAdapter`,
+      `WindowsInputAdapter`, `MacOSInputAdapter` stubs (Linux prioritized in
+      structure; all report unsupported with a reason — no fake backends).
+- [x] Host validates twice (channel frame via shared parser, IPC request via
+      shared parser in main), denormalizes against the true shared-display
+      size, dispatches per kind. Fire-and-forget `lantern:remote-input` IPC
+      (no ack at tens of Hz) + `get-remote-input-status` query channel.
+- [x] Honest unavailable state: host Session card shows "Remote input:
+      unavailable — reason" while sharing; client viewer shows INPUT chip when
+      sending; host shows last-received-input readout proving data flow.
+      No privileged OS input libraries — architecture and flow first.
+
+**Verify:** `typecheck` ✅, `lint` ✅ (incl. fixing a real rules-of-hooks
+violation the linter caught), protocol/coordinate checks 17/17 ✅
+(validation, letterbox math, denormalization, request parsing, evil
+dimensions rejected), app boot clean ✅.
+NOT verified headless: cursor actually moving (needs OS backend, pending)
+and two-live-instance flow — manual run: connect → share → move/click/wheel
+in client viewer → host Session card shows Last input updating; host cursor
+correctly does NOT move yet.
+
+**Commit:** `feat: add remote mouse control` (pending)
 
 **Verify:** moving/clicking in viewer moves/clicks on host (same- or dual-machine).
 

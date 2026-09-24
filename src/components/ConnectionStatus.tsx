@@ -8,6 +8,10 @@ export function ConnectionStatus() {
   const role = useConnectionStore((s) => s.role);
   const rtcState = useConnectionStore((s) => s.rtcState);
   const iceState = useConnectionStore((s) => s.iceState);
+  const sharing = useConnectionStore((s) => s.sharing);
+  const inputSupported = useConnectionStore((s) => s.inputSupported);
+  const inputUnavailableReason = useConnectionStore((s) => s.inputUnavailableReason);
+  const lastRemoteInput = useConnectionStore((s) => s.lastRemoteInput);
 
   return (
     <section className="card" aria-label="Connection status">
@@ -23,6 +27,14 @@ export function ConnectionStatus() {
       <p className="hint">
         WebRTC: <strong>{rtcState}</strong> · ICE: <strong>{iceState}</strong>
       </p>
+      {sharing && (
+        <p className="hint">
+          Remote input:{' '}
+          <strong>{inputSupported ? 'active' : 'unavailable'}</strong>
+          {!inputSupported && inputUnavailableReason ? ` — ${inputUnavailableReason}` : ''}
+          {lastRemoteInput ? ` · Last: ${lastRemoteInput}` : ''}
+        </p>
+      )}
     </section>
   );
 }

@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { parseControlMessage } from '../../shared/controlMessages.js';
 import { formatDeviceId } from '../../shared/deviceId.js';
+import type { RemoteInputMessage } from '../../shared/remoteInput.js';
 import { NEGOTIATION_TIMEOUT_MS, SIGNALING_ERROR_MESSAGES } from '../../shared/signaling.js';
+import { remoteInputService } from '../services/RemoteInputService.js';
 import { signalingService } from '../services/SignalingService.js';
 import { webrtcService } from '../services/WebRTCService.js';
 import { useConnectionStore } from '../stores/connectionStore.js';
@@ -48,6 +50,22 @@ function failSession(message: string): void {
   store.reset();
   store.setStatus('failed');
   store.setError(message);
+}
+
+/**
+ * One-line diagnostics summary (kind + normalized coords, 2 decimals).
+ * Shown in the host Session card so data flow is visible end to end.
+ */
+function summarizeInput(message: RemoteInputMessage): string {
+  const x = message.x.toFixed(2);
+  const y = message.y.toFixed(2);
+  if (message.kind === 'mouse-button') {
+    return `${message.event} ${message.button} (${x}, ${y})`;
+  }
+  if (message.kind === 'mouse-wheel') {
+    return `wheel Δ${message.deltaX},${message.deltaY} (${x}, ${y})`;
+  }
+  return `move (${x}, ${y})`;
 }
 
 /**
@@ -104,6 +122,15 @@ export function useSignalingSession(): {
       },
       onRemoteStream: (stream) => {
         useConnectionStore.getState().setRemoteStream(stream);
+      },
+      onRemoteInputMessage: (data) => {
+        // Host path only: the client never applies input to itself. Trust
+        // comes from the channel; content is validated inside forwardToHost.
+        const store = useConnectionStore.getState();
+        if (store.role !== 'host' || !store.sharing) return;
+        const message = remoteInputService.forwardToHost(data, store.sharedDisplaySize);
+        if (!message) return;
+        store.setLastRemoteInput(summarizeInput(message));
       },
       onControlMessage: (data) => {
         // Trust comes from the channel itself (only the peer holds it);
