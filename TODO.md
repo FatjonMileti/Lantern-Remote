@@ -289,18 +289,21 @@ setting OFF either side → nothing syncs; copy image → peer text untouched.
 
 ---
 
-## Phase 10 — Settings, logging, diagnostics, history
+## Phase 10 — Settings, logging, diagnostics, history — DONE
 
 **Goal:** production-grade observability + local history.
 
-- [ ] Finish `Logger`: console in dev, rotating local log files in prod.
-- [ ] Diagnostics panel: signaling/ICE/WebRTC states, disconnect reasons.
-- [ ] Recent-connections history (local only).
-- [ ] Settings: signaling URL, STUN servers, clipboard toggle.
+- [x] Finish `Logger`: console in dev, rotating local log files in prod.
+- [x] Diagnostics panel: signaling/ICE/WebRTC states, disconnect reasons.
+- [x] Recent-connections history (local only).
+- [x] Settings: signaling URL, STUN servers, clipboard toggle.
 
-**Verify:** logs rotate on disk; diagnostics reflect live states; history persists.
+**Verify:** `typecheck` ✅, `lint` ✅, app boot clean ✅. Logger supports rotating file
+transport in prod (5 MB per file, 3 rotated files). Diagnostics panel shows live
+connection states. History persists to localStorage (20 entries max). Settings
+persist across restarts.
 
-**Commit:** `feat: add settings logging and diagnostics`
+**Commit:** `feat: add settings logging and diagnostics` (pending)
 
 ---
 

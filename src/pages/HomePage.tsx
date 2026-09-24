@@ -2,6 +2,7 @@ import { ConnectionInput } from '../components/ConnectionInput.js';
 import { ConnectionStatus } from '../components/ConnectionStatus.js';
 import { ConnectionTokenCard } from '../components/ConnectionTokenCard.js';
 import { DeviceIdCard } from '../components/DeviceIdCard.js';
+import { DiagnosticsPanel } from '../components/DiagnosticsPanel.js';
 import { IncomingRequestModal } from '../components/IncomingRequestModal.js';
 import { RecentConnections } from '../components/RecentConnections.js';
 import { RemoteDesktopViewer } from '../components/RemoteDesktopViewer.js';
@@ -31,6 +32,11 @@ export function HomePage() {
   } = useScreenShare();
   const remoteId = useConnectionStore((s) => s.remoteId);
   const setRemoteId = useConnectionStore((s) => s.setRemoteId);
+
+  const handleConnectToRemote = (deviceId: string) => {
+    setRemoteId(deviceId);
+    void connectToRemote();
+  };
   const tokenInput = useConnectionStore((s) => s.tokenInput);
   const setTokenInput = useConnectionStore((s) => s.setTokenInput);
   const status = useConnectionStore((s) => s.status);
@@ -96,11 +102,12 @@ export function HomePage() {
           isFullscreen={fullscreen}
           onFullscreenChange={setFullscreen}
         />
-        <RecentConnections />
+        <RecentConnections onConnectToRemote={handleConnectToRemote} />
+        <DiagnosticsPanel />
         <SettingsPanel clipboardActive={clipboardActive} />
       </div>
       <footer className="footer">
-        <span>Phase 9 — text clipboard sync is opt-in (Settings, off by default).</span>
+        <span>Phase 10 — settings, logging, diagnostics, and connection history.</span>
       </footer>
       {incoming && (
         <IncomingRequestModal

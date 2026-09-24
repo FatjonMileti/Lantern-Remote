@@ -14,12 +14,14 @@ import {
 } from '../services/lanternBridge.js';
 import { useConnectionStore } from '../stores/connectionStore.js';
 import { useDeviceStore } from '../stores/deviceStore.js';
+import { useHistoryStore } from '../stores/historyStore.js';
+import { useSettingsStore } from '../stores/settingsStore.js';
 import { stopLocalCapture } from './useScreenShare.js';
 
 const DEFAULT_SIGNALING_URL = 'http://localhost:3001';
 
-function signalingUrl(): string {
-  return import.meta.env.VITE_SIGNALING_SERVER_URL ?? DEFAULT_SIGNALING_URL;
+function signalingUrl(settingsUrl: string): string {
+  return settingsUrl || import.meta.env.VITE_SIGNALING_SERVER_URL || DEFAULT_SIGNALING_URL;
 }
 
 let negotiationTimer: ReturnType<typeof setTimeout> | null = null;
@@ -101,10 +103,14 @@ export function useSignalingSession(): {
 } {
   const deviceId = useDeviceStore((s) => s.deviceId);
   const loading = useDeviceStore((s) => s.loading);
+  const addHistoryEntry = useHistoryStore((s) => s.addEntry);
+  const settingsSignalingUrl = useSettingsStore((s) => s.signalingUrl);
+  const settingsStunServers = useSettingsStore((s) => s.stunServers);
 
   useEffect(() => {
     if (loading || !deviceId || deviceId.includes('·')) return undefined;
 
+    webrtcService.setStunServers(settingsStunServers);
     webrtcService.setEvents({
       onConnectionState: (state) => {
         const store = useConnectionStore.getState();
@@ -276,7 +282,7 @@ export function useSignalingSession(): {
       },
     });
 
-    signalingService.connect(signalingUrl(), deviceId);
+    signalingService.connect(signalingUrl(settingsSignalingUrl), deviceId);
 
     return () => {
       clearNegotiationTimer();
@@ -284,7 +290,7 @@ export function useSignalingSession(): {
       signalingService.setListeners({});
       signalingService.disconnect();
     };
-  }, [deviceId, loading]);
+  }, [deviceId, loading, settingsSignalingUrl, settingsStunServers]);
 
   async function connectToRemote(): Promise<void> {
     const store = useConnectionStore.getState();
@@ -295,10 +301,12 @@ export function useSignalingSession(): {
       const roomId = await signalingService.requestConnection(store.remoteId, store.tokenInput);
       store.setRoomId(roomId);
       store.setStatus('waiting-for-approval');
+      addHistoryEntry({ deviceId: store.remoteId, role: 'client', success: true });
     } catch (error) {
       store.setRole(null);
       store.setStatus('failed');
       store.setError(error instanceof Error ? error.message : SIGNALING_ERROR_MESSAGES.INVALID_ID);
+      addHistoryEntry({ deviceId: store.remoteId, role: 'client', success: false });
     }
   }
 
@@ -316,11 +324,13 @@ export function useSignalingSession(): {
       store.setStatus('negotiating');
       store.setError(null);
       armNegotiationTimer();
+      addHistoryEntry({ deviceId: incoming.fromDeviceId, role: 'host', success: true });
     } catch (error) {
       store.setStatus('failed');
       store.setError(
         error instanceof Error ? error.message : SIGNALING_ERROR_MESSAGES.ROOM_NOT_FOUND,
       );
+      addHistoryEntry({ deviceId: incoming.fromDeviceId, role: 'host', success: false });
     }
   }
 

@@ -358,3 +358,132 @@ select {
   background: #3a1016;
   border-color: #ff9d9d;
 }
+
+.diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.diagnostic-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.diagnostic-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.diagnostic-item .label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.diagnostic-item .value {
+  font-size: 0.9rem;
+  font-family: monospace;
+  font-weight: 500;
+}
+
+.diagnostic-item .value.connected {
+  color: #7fe0a0;
+}
+
+.diagnostic-item .value.disconnected {
+  color: #ff9d9d;
+}
+
+.diagnostic-item .value.error {
+  color: #ff9d9d;
+  word-break: break-word;
+}
+
+.diagnostic-item .value.status-connected {
+  color: #7fe0a0;
+}
+
+.diagnostic-item .value.status-failed {
+  color: #ff9d9d;
+}
+
+.diagnostic-item .value.status-idle,
+.diagnostic-item .value.status-connecting,
+.diagnostic-item .value.status-negotiating {
+  color: var(--accent);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.card-header h2 {
+  margin: 0;
+}
+
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem;
+  background: #0c1117;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  gap: 0.75rem;
+}
+
+.history-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.history-device {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.history-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.history-failed {
+  font-size: 0.75rem;
+  color: #ff9d9d;
+  font-weight: 500;
+}
+
+.settings-section {
+  margin-bottom: 1rem;
+}
+
+.settings-section:last-child {
+  margin-bottom: 0;
+}
+
+.settings-label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

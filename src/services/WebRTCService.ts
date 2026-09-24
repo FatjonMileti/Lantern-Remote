@@ -31,12 +31,12 @@ const CLIPBOARD_CHANNEL_LABEL = 'clipboard';
 const DEFAULT_STUN_SERVERS = 'stun:stun.l.google.com:19302';
 
 /**
- * WHY this shape: STUN URLs come from the environment so production can
+ * WHY this shape: STUN URLs come from settings or environment so production can
  * inject its own without code changes. TURN entries
  * ({ urls, username, credential }) append to this same array later.
  */
-function buildIceServers(): RTCIceServer[] {
-  const raw = import.meta.env.VITE_STUN_SERVERS ?? DEFAULT_STUN_SERVERS;
+function buildIceServers(settingsStunServers: string): RTCIceServer[] {
+  const raw = settingsStunServers || import.meta.env.VITE_STUN_SERVERS || DEFAULT_STUN_SERVERS;
   const urls = raw
     .split(',')
     .map((entry: string) => entry.trim())
@@ -50,9 +50,14 @@ export class WebRTCService {
   private inputChannel: RTCDataChannel | null = null;
   private clipboardChannel: RTCDataChannel | null = null;
   private events: WebRTCEvents = {};
+  private settingsStunServers: string = '';
 
   setEvents(events: WebRTCEvents): void {
     this.events = events;
+  }
+
+  setStunServers(servers: string): void {
+    this.settingsStunServers = servers;
   }
 
   get connectionState(): RTCPeerConnectionState {
@@ -200,7 +205,7 @@ export class WebRTCService {
    */
   private ensurePeerConnection(): RTCPeerConnection {
     if (this.pc) return this.pc;
-    const pc = new RTCPeerConnection({ iceServers: buildIceServers() });
+    const pc = new RTCPeerConnection({ iceServers: buildIceServers(this.settingsStunServers) });
     this.pc = pc;
     pc.onconnectionstatechange = () => {
       this.events.onConnectionState?.(pc.connectionState);
