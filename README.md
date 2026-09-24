@@ -70,15 +70,15 @@ sequenceDiagram
   H->>S: register-device (ID)
   C->>S: connection-request (host ID + code)
   S->>H: incoming-connection (room, from, code)
-  Note over H: host validates code BEFORE any dialog;<br/>wrong codes auto-reject, never modal'd
+  Note over H: host validates code BEFORE any dialog - wrong codes auto-reject, never shown as modal
   H->>S: connection-accepted (room)
   S->>C: connection-accepted (room, host)
-  C->>S: webrtc-offer (client→host only)
+  C->>S: webrtc-offer (client to host only)
   S->>H: webrtc-offer
-  H->>S: webrtc-answer (host→client only)
+  H->>S: webrtc-answer (host to client only)
   S->>C: webrtc-answer
-  C<->>H: ICE trickle via server, then connected
-  H->>C: control: video-tracks-added
+  Note over C,H: ICE trickle via server, then connected
+  H->>C: control video-tracks-added
   C->>S: re-offer (same peer connection)
   H->>C: screen video + remote-input + clipboard
 ```
