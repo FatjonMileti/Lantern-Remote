@@ -26,4 +26,12 @@ export class WindowsInputAdapter implements RemoteInputAdapter {
   mouseWheel(_deltaX: number, _deltaY: number, _x: number, _y: number): Promise<void> {
     return Promise.reject(new Error(REASON));
   }
+
+  keyDown(_code: string): Promise<void> {
+    return Promise.reject(new Error(REASON));
+  }
+
+  keyUp(_code: string): Promise<void> {
+    return Promise.reject(new Error(REASON));
+  }
 }

@@ -52,9 +52,17 @@ export class RemoteInputService {
       } else if (message.kind === 'mouse-button') {
         const p = denormalizePoint(display, message.x, message.y);
         await this.adapter.mouseButton(message.button, message.event, p.x, p.y);
-      } else {
+      } else if (message.kind === 'mouse-wheel') {
         const p = denormalizePoint(display, message.x, message.y);
         await this.adapter.mouseWheel(message.deltaX, message.deltaY, p.x, p.y);
+      } else {
+        // Keyboard carries no coordinates; `code` was whitelisted by the
+        // shared parser, and adapters map it (never the layoutful `key`).
+        if (message.event === 'keydown') {
+          await this.adapter.keyDown(message.code);
+        } else {
+          await this.adapter.keyUp(message.code);
+        }
       }
       return { ok: true, kind: message.kind, reason: null };
     } catch (error) {

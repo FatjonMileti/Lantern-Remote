@@ -17,6 +17,83 @@ function buttonNumber(button: RemoteInputMouseButton): number {
   return 1;
 }
 
+/**
+ * `KeyboardEvent.code` → xdotool keysym. Covers the shared whitelist;
+ * anything unmapped rejects explicitly (whitelist and map evolve together).
+ */
+function buildKeymap(): ReadonlyMap<string, string> {
+  const map = new Map<string, string>();
+  for (let i = 0; i < 26; i += 1) {
+    const letter = String.fromCharCode(97 + i);
+    map.set(`Key${letter.toUpperCase()}`, letter);
+  }
+  for (let i = 0; i <= 9; i += 1) {
+    map.set(`Digit${i}`, String(i));
+    map.set(`Numpad${i}`, `KP_${i}`);
+  }
+  for (let i = 1; i <= 24; i += 1) map.set(`F${i}`, `F${i}`);
+  const named: Array<[string, string]> = [
+    ['AltLeft', 'Alt_L'],
+    ['AltRight', 'Alt_R'],
+    ['ArrowDown', 'Down'],
+    ['ArrowLeft', 'Left'],
+    ['ArrowRight', 'Right'],
+    ['ArrowUp', 'Up'],
+    ['AudioVolumeDown', 'XF86AudioLowerVolume'],
+    ['AudioVolumeMute', 'XF86AudioMute'],
+    ['AudioVolumeUp', 'XF86AudioRaiseVolume'],
+    ['Backquote', 'grave'],
+    ['Backslash', 'backslash'],
+    ['Backspace', 'BackSpace'],
+    ['BracketLeft', 'bracketleft'],
+    ['BracketRight', 'bracketright'],
+    ['CapsLock', 'Caps_Lock'],
+    ['Comma', 'comma'],
+    ['ContextMenu', 'Menu'],
+    ['ControlLeft', 'Control_L'],
+    ['ControlRight', 'Control_R'],
+    ['Delete', 'Delete'],
+    ['End', 'End'],
+    ['Enter', 'Return'],
+    ['Equal', 'equal'],
+    ['Escape', 'Escape'],
+    ['Home', 'Home'],
+    ['Insert', 'Insert'],
+    ['IntlBackslash', 'backslash'],
+    ['MediaPlayPause', 'XF86AudioPlay'],
+    ['MediaStop', 'XF86AudioStop'],
+    ['MediaTrackNext', 'XF86AudioNext'],
+    ['MediaTrackPrevious', 'XF86AudioPrev'],
+    ['MetaLeft', 'Super_L'],
+    ['MetaRight', 'Super_R'],
+    ['Minus', 'minus'],
+    ['NumLock', 'Num_Lock'],
+    ['NumpadAdd', 'KP_Add'],
+    ['NumpadDecimal', 'KP_Decimal'],
+    ['NumpadDivide', 'KP_Divide'],
+    ['NumpadEnter', 'KP_Enter'],
+    ['NumpadMultiply', 'KP_Multiply'],
+    ['NumpadSubtract', 'KP_Subtract'],
+    ['PageDown', 'Page_Down'],
+    ['PageUp', 'Page_Up'],
+    ['Pause', 'Pause'],
+    ['Period', 'period'],
+    ['PrintScreen', 'Print'],
+    ['Quote', 'apostrophe'],
+    ['ScrollLock', 'Scroll_Lock'],
+    ['Semicolon', 'semicolon'],
+    ['ShiftLeft', 'Shift_L'],
+    ['ShiftRight', 'Shift_R'],
+    ['Slash', 'slash'],
+    ['Space', 'space'],
+    ['Tab', 'Tab'],
+  ];
+  for (const [code, keysym] of named) map.set(code, keysym);
+  return map;
+}
+
+const KEYMAP: ReadonlyMap<string, string> = buildKeymap();
+
 function wheelNotches(delta: number): number {
   const notches = Math.round(Math.abs(delta) / WHEEL_NOTCH_PX);
   return Math.min(MAX_WHEEL_NOTCHES, Math.max(1, notches));
@@ -127,6 +204,22 @@ export class LinuxInputAdapter implements RemoteInputAdapter {
       args.push('--repeat', String(count), String(button));
     }
     return this.enqueue(args);
+  }
+
+  keyDown(code: string): Promise<void> {
+    const keysym = KEYMAP.get(code);
+    if (!keysym) {
+      return Promise.reject(new Error(`xdotool has no mapping for key ${code}.`));
+    }
+    return this.enqueue(['keydown', keysym]);
+  }
+
+  keyUp(code: string): Promise<void> {
+    const keysym = KEYMAP.get(code);
+    if (!keysym) {
+      return Promise.reject(new Error(`xdotool has no mapping for key ${code}.`));
+    }
+    return this.enqueue(['keyup', keysym]);
   }
 
   private enqueue(args: string[]): Promise<void> {

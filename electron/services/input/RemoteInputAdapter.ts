@@ -23,4 +23,7 @@ export interface RemoteInputAdapter {
     y: number,
   ): Promise<void>;
   mouseWheel(deltaX: number, deltaY: number, x: number, y: number): Promise<void>;
+  /** `code` is a whitelisted `KeyboardEvent.code` (layout-independent). */
+  keyDown(code: string): Promise<void>;
+  keyUp(code: string): Promise<void>;
 }

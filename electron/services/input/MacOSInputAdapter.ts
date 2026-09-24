@@ -43,6 +43,61 @@ function point(x: number, y: number): string {
   return `${Math.round(x)},${Math.round(y)}`;
 }
 
+/** Modifier codes → cliclick `kd`/`ku` names (the only true hold/release). */
+const MODIFIERS: ReadonlyMap<string, string> = new Map([
+  ['ShiftLeft', 'shift'],
+  ['ShiftRight', 'shift'],
+  ['ControlLeft', 'ctrl'],
+  ['ControlRight', 'ctrl'],
+  ['AltLeft', 'alt'],
+  ['AltRight', 'alt'],
+  ['MetaLeft', 'cmd'],
+  ['MetaRight', 'cmd'],
+]);
+
+/**
+ * `KeyboardEvent.code` → cliclick `kp` names. kp presses are atomic
+ * (down+up at once), so keyup for these is a no-op by design. Codes outside
+ * this table (letters, digits, punctuation, F17+, …) have no cliclick
+ * equivalent and reject explicitly — text entry needs a follow-up backend.
+ */
+function buildPressableKeys(): ReadonlyMap<string, string> {
+  const map = new Map<string, string>();
+  for (let i = 1; i <= 16; i += 1) map.set(`F${i}`, `f${i}`);
+  for (let i = 0; i <= 9; i += 1) map.set(`Numpad${i}`, `num-${i}`);
+  const named: Array<[string, string]> = [
+    ['ArrowDown', 'arrow-down'],
+    ['ArrowLeft', 'arrow-left'],
+    ['ArrowRight', 'arrow-right'],
+    ['ArrowUp', 'arrow-up'],
+    ['AudioVolumeDown', 'volume-down'],
+    ['AudioVolumeMute', 'mute'],
+    ['AudioVolumeUp', 'volume-up'],
+    ['Backspace', 'delete'],
+    ['Delete', 'fwd-delete'],
+    ['End', 'end'],
+    ['Enter', 'return'],
+    ['Escape', 'esc'],
+    ['Home', 'home'],
+    ['MediaPlayPause', 'play-pause'],
+    ['MediaTrackNext', 'play-next'],
+    ['MediaTrackPrevious', 'play-previous'],
+    ['NumpadAdd', 'num-plus'],
+    ['NumpadDivide', 'num-divide'],
+    ['NumpadEnter', 'num-enter'],
+    ['NumpadMultiply', 'num-multiply'],
+    ['NumpadSubtract', 'num-minus'],
+    ['PageDown', 'page-down'],
+    ['PageUp', 'page-up'],
+    ['Space', 'space'],
+    ['Tab', 'tab'],
+  ];
+  for (const [code, name] of named) map.set(code, name);
+  return map;
+}
+
+const PRESSABLE_KEYS: ReadonlyMap<string, string> = buildPressableKeys();
+
 /**
  * macOS input sink via cliclick (`brew install cliclick`).
  *
@@ -104,6 +159,27 @@ export class MacOSInputAdapter implements RemoteInputAdapter {
 
   mouseWheel(_deltaX: number, _deltaY: number, _x: number, _y: number): Promise<void> {
     return Promise.reject(new Error('cliclick has no scroll-wheel command.'));
+  }
+
+  keyDown(code: string): Promise<void> {
+    const modifier = MODIFIERS.get(code);
+    if (modifier) return this.enqueue([`kd:${modifier}`]);
+    const key = PRESSABLE_KEYS.get(code);
+    if (!key) {
+      return Promise.reject(new Error(`cliclick has no key mapping for ${code}.`));
+    }
+    return this.enqueue([`kp:${key}`]);
+  }
+
+  keyUp(code: string): Promise<void> {
+    const modifier = MODIFIERS.get(code);
+    if (modifier) return this.enqueue([`ku:${modifier}`]);
+    if (!PRESSABLE_KEYS.get(code)) {
+      return Promise.reject(new Error(`cliclick has no key mapping for ${code}.`));
+    }
+    // kp presses complete atomically at keydown — nothing is held, so the
+    // keyup is a deliberate no-op rather than a second press.
+    return Promise.resolve();
   }
 
   private enqueue(args: string[]): Promise<void> {

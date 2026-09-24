@@ -31,6 +31,7 @@ export function RemoteDesktopViewer({
   const [scaleMode, setScaleMode] = useState<'fit' | 'actual'>('fit');
   const [fps, setFps] = useState(0);
   const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
+  const [keyboardFocused, setKeyboardFocused] = useState(false);
   // Capture is client-side only: the host never drives input into itself.
   const role = useConnectionStore((s) => s.role);
   const sessionStatus = useConnectionStore((s) => s.status);
@@ -180,6 +181,10 @@ export function RemoteDesktopViewer({
           className={`remote-video${scaleMode === 'actual' ? ' actual-size' : ''}`}
           autoPlay
           playsInline
+          tabIndex={0}
+          title="Click to capture keyboard input"
+          onFocus={() => setKeyboardFocused(true)}
+          onBlur={() => setKeyboardFocused(false)}
         />
         <div className="viewer-overlay" aria-live="off">
           <span className="fps-badge">{fps} FPS</span>
@@ -189,6 +194,11 @@ export function RemoteDesktopViewer({
           {inputActive && (
             <span className="input-badge" title="Mouse input is being sent to the host">
               INPUT
+            </span>
+          )}
+          {inputActive && keyboardFocused && (
+            <span className="input-badge" title="Keyboard input is being sent to the host">
+              KEYS
             </span>
           )}
         </div>

@@ -5,11 +5,9 @@ A portfolio-quality project demonstrating real-time communication, desktop captu
 and secure Electron architecture. Inspired by the _architecture_ of tools like
 AnyDesk/TeamViewer — no branding, proprietary UI, or code is copied.
 
-> **Phase 6 status:** remote mouse data flow is complete — client captures
-> normalized pointer events over the `remote-input` DataChannel, host
-> validates, denormalizes, and dispatches to OS adapters. Adapters are honest
-> stubs (no privileged backend yet), so no cursor moves. Keyboard (Phase 7)
-> is not yet implemented.
+> **Phase 7 status:** remote keyboard is live — focus-keyed capture with
+> held-key flush, whitelisted `code` protocol, xdotool/cliclick backends.
+> Connection tokens (Phase 8) are not yet implemented.
 
 ## Architecture
 
@@ -113,12 +111,14 @@ See `SECURITY.md`. Key points:
 - WebRTC media/DataChannels are encrypted; signaling carries no video.
 - Device ID is persisted under `app.getPath('userData')`, never a MAC address.
 
-## Known limitations (Phase 6 + native backends)
+## Known limitations (Phase 7)
 
-- Linux/X11 host input works via xdotool; macOS via cliclick (move, left
-  press/release/click/double-click, right-click — middle button, right
-  press/release, and wheel have no cliclick equivalent and reject explicitly).
+- Linux/X11 host input works via xdotool (mouse + keyboard); macOS via
+  cliclick (mouse: move/left/right-click; keyboard: modifiers + listed
+  special keys — letters and wheel have no cliclick equivalent).
   Wayland sessions need ydotool instead (planned).
+- Keyboard capture needs the video focused (click it, KEYS chip shows);
+  browser-reserved chords (Ctrl+W etc.) still act locally.
 - Windows adapters still report unsupported until native backends land.
 - Keyboard events arrive in Phase 7; clipboard in Phase 9.
 - No ICE retry on `disconnected`; a failed peer tears the session down.
@@ -128,5 +128,5 @@ See `SECURITY.md`. Key points:
 
 ## Roadmap
 
-Phases 7–12 per spec: keyboard →
+Phases 8–12 per spec: tokens →
 keyboard → auth tokens → clipboard → settings/logging → tests → polish.

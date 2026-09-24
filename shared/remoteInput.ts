@@ -36,13 +36,107 @@ export interface MouseWheelMessage {
   y: number;
 }
 
-export type RemoteInputMessage = MouseMoveMessage | MouseButtonMessage | MouseWheelMessage;
+export interface KeyboardMessage {
+  kind: 'keyboard';
+  event: 'keydown' | 'keyup';
+  /** Layout-dependent label (informational only — adapters map `code`). */
+  key: string;
+  /** Layout-independent code, must be whitelisted below. */
+  code: string;
+}
+
+export type RemoteInputMessage =
+  | MouseMoveMessage
+  | MouseButtonMessage
+  | MouseWheelMessage
+  | KeyboardMessage;
 
 export const MAX_WHEEL_DELTA = 1_000_000;
 export const MAX_SHARED_DIMENSION = 16_384;
 
 const BUTTONS: ReadonlySet<string> = new Set(['left', 'middle', 'right']);
 const BUTTON_EVENTS: ReadonlySet<string> = new Set(['down', 'up', 'click', 'double-click']);
+const KEYBOARD_EVENTS: ReadonlySet<string> = new Set(['keydown', 'keyup']);
+
+/**
+ * Whitelisted `KeyboardEvent.code` values (W3C UI Events code set, common
+ * subset). The host processes ONLY these — anything else (including
+ * `Unidentified`) is rejected. Adapters map `code`, never the
+ * layout-dependent `key`, so QWERTZ/AZERTY senders drive the right position.
+ */
+function buildKeyboardCodeWhitelist(): ReadonlySet<string> {
+  const codes = new Set<string>();
+  for (let i = 0; i < 26; i += 1) codes.add(`Key${String.fromCharCode(65 + i)}`);
+  for (let i = 0; i <= 9; i += 1) {
+    codes.add(`Digit${i}`);
+    codes.add(`Numpad${i}`);
+  }
+  for (let i = 1; i <= 24; i += 1) codes.add(`F${i}`);
+  for (const code of [
+    'AltLeft',
+    'AltRight',
+    'ArrowDown',
+    'ArrowLeft',
+    'ArrowRight',
+    'ArrowUp',
+    'AudioVolumeDown',
+    'AudioVolumeMute',
+    'AudioVolumeUp',
+    'Backquote',
+    'Backslash',
+    'Backspace',
+    'BracketLeft',
+    'BracketRight',
+    'CapsLock',
+    'Comma',
+    'ContextMenu',
+    'ControlLeft',
+    'ControlRight',
+    'Delete',
+    'End',
+    'Enter',
+    'Equal',
+    'Escape',
+    'Home',
+    'Insert',
+    'IntlBackslash',
+    'MediaPlayPause',
+    'MediaStop',
+    'MediaTrackNext',
+    'MediaTrackPrevious',
+    'MetaLeft',
+    'MetaRight',
+    'Minus',
+    'NumLock',
+    'NumpadAdd',
+    'NumpadDecimal',
+    'NumpadDivide',
+    'NumpadEnter',
+    'NumpadMultiply',
+    'NumpadSubtract',
+    'PageDown',
+    'PageUp',
+    'Pause',
+    'Period',
+    'PrintScreen',
+    'Quote',
+    'ScrollLock',
+    'Semicolon',
+    'ShiftLeft',
+    'ShiftRight',
+    'Slash',
+    'Space',
+    'Tab',
+  ]) {
+    codes.add(code);
+  }
+  return codes;
+}
+
+export const KEYBOARD_CODE_WHITELIST: ReadonlySet<string> = buildKeyboardCodeWhitelist();
+
+/** `key` is descriptive only; still bounded so frames stay small. */
+export const MAX_KEY_LENGTH = 32;
 
 function isUnit(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
@@ -86,6 +180,20 @@ export function parseRemoteInputMessage(value: unknown): RemoteInputMessage | nu
     if (!isDelta(record.deltaX) || !isDelta(record.deltaY)) return null;
     if (!isUnit(record.x) || !isUnit(record.y)) return null;
     return { kind, x: record.x, y: record.y, deltaX: record.deltaX, deltaY: record.deltaY };
+  }
+  if (kind === 'keyboard') {
+    if (typeof record.event !== 'string' || !KEYBOARD_EVENTS.has(record.event)) return null;
+    if (typeof record.key !== 'string' || record.key.length === 0) return null;
+    if (record.key.length > MAX_KEY_LENGTH) return null;
+    if (typeof record.code !== 'string' || !KEYBOARD_CODE_WHITELIST.has(record.code)) {
+      return null;
+    }
+    return {
+      kind,
+      event: record.event as KeyboardMessage['event'],
+      key: record.key,
+      code: record.code,
+    };
   }
   return null;
 }

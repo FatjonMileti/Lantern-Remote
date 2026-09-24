@@ -187,6 +187,11 @@ select {
   border: 1px solid var(--border);
 }
 
+.remote-video:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .remote-video.actual-size {
   width: auto;
   max-width: none;

@@ -197,17 +197,33 @@ Windows backend (nut.js vs PowerShell helper decision).
 
 ---
 
-## Phase 7 — Remote keyboard control
+## Phase 7 — Remote keyboard control — DONE (uncommitted)
 
 **Goal:** client keystrokes reach host via DataChannel.
 
-- [ ] Send structured `{ type: 'keyboard', event: 'keydown'|'keyup', key, code }`.
-- [ ] Host processes only whitelisted event types; never executes arbitrary input.
-- [ ] Handle focus/blur edge cases (stuck keys on disconnect), keyup flush.
+- [x] Structured `{ kind: 'keyboard', event: 'keydown'|'keyup', key, code }`
+      (`kind`, not `type`, per the established protocol envelope). `code` is
+      authoritative for mapping; `key` informational, length-capped.
+- [x] Host processes only whitelisted `code` values (~140-entry set: letters,
+      digits, numpad, F1–F24, modifiers, arrows, navigation, punctuation,
+      media). `Unidentified` and anything unlisted is rejected at the shared
+      parser — main re-validates before dispatch. xdotool keysym table;
+      cliclick modifiers (`kd`/`ku`) + listed `kp` keys, atomic-press keyup
+      no-op documented; unmapped codes reject explicitly on both.
+- [x] Focus/blur safety: capture only while the video element is focused
+      (tabIndex + KEYS chip + focus ring); client tracks held codes and
+      flushes keyups on window blur and on detach (disconnect path included),
+      so no stuck keys. Auto-repeat forwards as physical hold. No arbitrary
+      JS crosses the channel — parsed messages only.
 
-**Verify:** typing in focused viewer types on host; no stuck keys after disconnect.
+**Verify:** `typecheck` ✅, `lint` ✅, validator 7/7 ✅, xdotool keymap 8/8 ✅
+(incl. unmapped rejection), cliclick keys 2/2 ✅, boot clean ✅. No live
+key presses executed by tests (would type on this box).
+NOT verified headless: real typing host↔client — manual run: connect →
+share → click video (KEYS chip) → type → host app receives; Alt+Tab away →
+no stuck keys.
 
-**Commit:** `feat: add remote keyboard control`
+**Commit:** `feat: add remote keyboard control` (pending)
 
 ---
 

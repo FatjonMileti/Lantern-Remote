@@ -1,4 +1,6 @@
 import {
+  KEYBOARD_CODE_WHITELIST,
+  MAX_KEY_LENGTH,
   normalizePoint,
   parseRemoteInputMessage,
   serializeRemoteInputMessage,
@@ -36,19 +38,25 @@ function toPixels(delta: number, mode: number): number {
  * Client: pointer events over the remote video become normalized messages
  * on the `remote-input` channel. Moves are throttled with trailing-latest
  * semantics; down/up/wheel send immediately; right-click menu is suppressed
- * while control is active so right button reaches the host.
+ * while control is active so right button reaches the host. Keyboard is
+ * captured only while the video element has focus (click it first) —
+ * page-level capture would hijack browser shortcuts.
  *
  * Host: validated inbound frames are forwarded to main with the shared
  * display size; main denormalizes and dispatches to the OS adapter.
  */
 class RendererRemoteInputService {
+  /** Codes currently held down — flushed as keyups on blur/detach. */
+  private readonly heldKeys = new Set<string>();
+
   send(message: RemoteInputMessage): boolean {
     return webrtcService.sendRemoteInput(serializeRemoteInputMessage(message));
   }
 
   /**
-   * Attach capture listeners; returns detach. Caller gates on role/status —
-   * this service owns normalization, throttling, and serialization only.
+   * Attach capture listeners; returns detach. Detach (and window blur)
+   * flush keyups for every held key so the host can never stick a key.
+   * Caller gates on role/status — this service owns events and framing only.
    */
   attachCapture(video: HTMLVideoElement): () => void {
     let lastMoveAt = 0;
@@ -123,18 +131,67 @@ class RendererRemoteInputService {
       event.preventDefault();
     };
 
+    const keyMessage = (
+      event: KeyboardEvent,
+      keyEvent: 'keydown' | 'keyup',
+    ): RemoteInputMessage | null => {
+      // Whitelist first: unlisted codes (and `Unidentified`) never leave.
+      if (!KEYBOARD_CODE_WHITELIST.has(event.code)) return null;
+      const key = event.key.length > 0 ? event.key.slice(0, MAX_KEY_LENGTH) : event.code;
+      return { kind: 'keyboard', event: keyEvent, key, code: event.code };
+    };
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      const message = keyMessage(event, 'keydown');
+      if (!message) return;
+      // Stop local side effects (scroll on Space/arrows, focus move on Tab).
+      // Browser-reserved chords (Ctrl+W etc.) still act locally — documented.
+      event.preventDefault();
+      // Auto-repeat forwards like a physical hold; the host sees repeats.
+      if (this.send(message)) {
+        this.heldKeys.add(event.code);
+      }
+    };
+
+    const onKeyUp = (event: KeyboardEvent): void => {
+      const message = keyMessage(event, 'keyup');
+      this.heldKeys.delete(event.code);
+      if (!message) return;
+      event.preventDefault();
+      this.send(message);
+    };
+
+    const flushHeldKeys = (): void => {
+      if (this.heldKeys.size === 0) return;
+      for (const code of this.heldKeys) {
+        this.send({ kind: 'keyboard', event: 'keyup', key: code, code });
+      }
+      this.heldKeys.clear();
+    };
+
+    const onBlur = (): void => {
+      flushHeldKeys();
+    };
+
     video.addEventListener('mousemove', onMouseMove);
     video.addEventListener('mousedown', onMouseDown);
     video.addEventListener('mouseup', onMouseUp);
     video.addEventListener('wheel', onWheel, { passive: false });
     video.addEventListener('contextmenu', onContextMenu);
+    video.addEventListener('keydown', onKeyDown);
+    video.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
     return () => {
       if (trailingTimer) clearTimeout(trailingTimer);
+      flushHeldKeys();
       video.removeEventListener('mousemove', onMouseMove);
       video.removeEventListener('mousedown', onMouseDown);
       video.removeEventListener('mouseup', onMouseUp);
       video.removeEventListener('wheel', onWheel);
       video.removeEventListener('contextmenu', onContextMenu);
+      video.removeEventListener('keydown', onKeyDown);
+      video.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
     };
   }
 

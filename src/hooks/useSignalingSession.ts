@@ -57,6 +57,9 @@ function failSession(message: string): void {
  * Shown in the host Session card so data flow is visible end to end.
  */
 function summarizeInput(message: RemoteInputMessage): string {
+  if (message.kind === 'keyboard') {
+    return `${message.event} ${message.code}`;
+  }
   const x = message.x.toFixed(2);
   const y = message.y.toFixed(2);
   if (message.kind === 'mouse-button') {
