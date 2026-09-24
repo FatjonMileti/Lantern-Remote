@@ -307,20 +307,40 @@ persist across restarts.
 
 ---
 
-## Phase 11 — Automated tests
+## Phase 11 — Automated tests — DONE
 
 **Goal:** unit coverage for logic that must not regress.
 
-- [ ] Device ID generation/formatting/persistence (mocked storage).
-- [ ] Token generation (mock `randomInt`), expiry logic.
-- [ ] Remote message validation (valid + malformed inputs).
-- [ ] Connection state transitions.
-- [ ] Signaling message routing (mocked sockets).
-- [ ] Normalized mouse-coordinate conversion.
-- [ ] Cleanup logic (rooms, peer connections, listeners).
-- [ ] Mocks/adapters for platform input; **no real OS mouse movement in tests.**
+- [x] Device ID generation/formatting/persistence — `shared/deviceId.test.ts`
+      plus `DeviceIdentityService.test.ts` (mocked Electron `app.getPath`
+      → tmp dir, real fs): first-run generation, reload stability,
+      corrupt-file recovery, single-flight concurrent-call race.
+- [x] Token generation (real `randomInt`, format + lifecycle) + expiry logic —
+      `ConnectionTokenService.test.ts` with fake clock: TTL, rotation,
+      burn-once, revoke, validation never consumes.
+- [x] Remote message validation (valid + malformed) — `remoteInput.test.ts`,
+      `clipboard` protocol checks, `ClipboardService.test.ts` (seed silence,
+      send-once, echo suppression, malformed/oversize/duplicate ignored).
+- [x] Connection state transitions — `connectionStore.test.ts` (lifecycle,
+      errors, reset, counters).
+- [x] Signaling message routing (real sockets, ephemeral port) —
+      `server/socket/routing.test.ts`: registration, token required,
+      opaque passthrough, reject-reason relay, busy/second-request refusal,
+      accept flow, offer-direction enforcement, disconnect cleanup, offline.
+- [x] Normalized mouse-coordinate conversion — `normalizePoint` letterbox,
+      outside-null, zero-dimension cases.
+- [x] Cleanup logic — `connectionRooms.test.ts` (remove clears indexes,
+      expiry spares accepted), `deviceRegistry.test.ts` (displacement,
+      stale-socket safety), WebRTC close idempotence, clipboard stop.
+- [x] Mocks/adapters for platform input; **no real OS movement in tests** —
+      `src/test/mocks.ts` (Linux/Windows/macOS adapters incl. cliclick
+      wheel no-op) + `mocks.test.ts`; main input dispatch only exercised
+      on invalid frames (never a live adapter call).
 
-**Verify:** `npm test` (or chosen runner) green; typecheck + lint green.
+**Verify:** `npm run test:run` **170/170 green** (15 files); `typecheck` ✅,
+`lint` ✅ (incl. test files — typed bridge mock, no `any`), boot clean ✅.
+NOT verified headless: real peer connections, OS clipboard/input, Electron
+clipboard read/write — manual two-instance runs per earlier phases.
 
 **Commit:** `test: add core application tests`
 

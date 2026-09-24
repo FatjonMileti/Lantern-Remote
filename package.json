@@ -17,7 +17,9 @@
     "lint:fix": "eslint --ext .ts,.tsx electron src server shared --fix",
     "format": "prettier --write \"**/*.{ts,tsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,css,md}\"",
-    "test": "echo \"No tests yet (Phase 11).\" && exit 0"
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run"
   },
   "keywords": [
     "electron",
@@ -46,19 +48,25 @@
     "@electron-forge/plugin-fuses": "^7.11.2",
     "@electron-forge/plugin-vite": "^7.11.2",
     "@electron/fuses": "^1.8.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^11.0.0-beta.1",
+    "@testing-library/user-event": "^14.6.7",
     "@types/electron-squirrel-startup": "^1.0.2",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.6",
     "@typescript-eslint/eslint-plugin": "^8.39.0",
     "@typescript-eslint/parser": "^8.39.0",
     "@vitejs/plugin-react": "^4.7.0",
+    "@vitest/ui": "^1.6.0",
     "electron": "44.4.3",
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
+    "jsdom": "^30.1.1",
     "prettier": "^3.6.2",
     "tsx": "^4.23.15",
     "typescript": "~5.9.2",
-    "vite": "^5.4.21"
+    "vite": "^5.4.21",
+    "vitest": "^1.6.0"
   }
 }
