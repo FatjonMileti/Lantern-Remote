@@ -91,6 +91,18 @@ VITE_SIGNALING_SERVER_URL=http://localhost:3001
 STUN_SERVERS=stun:stun.l.google.com:19302
 ```
 
+## Host requirements (remote input)
+
+Remote control needs an OS input backend on the **host** machine (runtime
+requirement, not a build dependency — the app runs fine without it and
+reports "unavailable" honestly):
+
+| Host OS     | Install                    | Notes                                                                                |
+| ----------- | -------------------------- | ------------------------------------------------------------------------------------ |
+| Linux (X11) | `sudo apt install xdotool` | Wayland sessions need ydotool instead (planned)                                      |
+| macOS       | `brew install cliclick`    | Grant Accessibility permission: System Settings → Privacy & Security → Accessibility |
+| Windows     | —                          | No backend yet (see roadmap)                                                         |
+
 ## Security model (summary)
 
 See `SECURITY.md`. Key points:
@@ -101,10 +113,13 @@ See `SECURITY.md`. Key points:
 - WebRTC media/DataChannels are encrypted; signaling carries no video.
 - Device ID is persisted under `app.getPath('userData')`, never a MAC address.
 
-## Known limitations (Phase 6)
+## Known limitations (Phase 6 + native backends)
 
-- Mouse events reach the host dispatcher but no OS cursor moves: Linux /
-  Windows / macOS adapters report unsupported until privileged backends land.
+- Linux/X11 host input works via xdotool; macOS via cliclick (move, left
+  press/release/click/double-click, right-click — middle button, right
+  press/release, and wheel have no cliclick equivalent and reject explicitly).
+  Wayland sessions need ydotool instead (planned).
+- Windows adapters still report unsupported until native backends land.
 - Keyboard events arrive in Phase 7; clipboard in Phase 9.
 - No ICE retry on `disconnected`; a failed peer tears the session down.
 - Temporary connection tokens arrive in Phase 8.

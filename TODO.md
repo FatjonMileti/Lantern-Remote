@@ -147,7 +147,7 @@ instances — same manual run as Phase 4, now checking Fit/1:1/Fullscreen/FPS.
 
 ---
 
-## Phase 6 — Remote mouse control — DONE (uncommitted)
+## Phase 6 — Remote mouse control — DONE
 
 **Goal:** client mouse drives host cursor via `remote-input` DataChannel.
 
@@ -180,11 +180,20 @@ and two-live-instance flow — manual run: connect → share → move/click/whee
 in client viewer → host Session card shows Last input updating; host cursor
 correctly does NOT move yet.
 
-**Commit:** `feat: add remote mouse control` (pending)
-
-**Verify:** moving/clicking in viewer moves/clicks on host (same- or dual-machine).
-
 **Commit:** `feat: add remote mouse control`
+
+**Follow-up (uncommitted):** `LinuxInputAdapter` now drives a real cursor via
+xdotool (X11): argv-only `execFile` (no shell), serial queue, per-command
+timeout, button mapping 1/2/3, wheel via buttons 4–7, injected-runner seam
+for unit tests. Verified with fake-runner checks (command strings, ordering,
+failure isolation).
+`MacOSInputAdapter` via cliclick (`brew install cliclick`): `m`/`dd`/`du`/
+`c`/`dc`/`rc` mapped (drag works as dd…m…du); middle, right press/release,
+and wheel have no cliclick equivalent and reject explicitly; Accessibility
+denial detected via stderr and surfaced. Verified with a fake on-PATH binary
+through the real exec path.
+Still open: live cursor tests on real hardware, ydotool backend for Wayland,
+Windows backend (nut.js vs PowerShell helper decision).
 
 ---
 
