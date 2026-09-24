@@ -40,6 +40,9 @@ export interface LanternApi {
   validateConnectionToken: (code: string) => Promise<boolean>;
   consumeConnectionToken: () => Promise<boolean>;
   clearConnectionToken: () => Promise<void>;
+  /** Phase 9: text-only clipboard access (contents never logged). */
+  getClipboardText: () => Promise<string>;
+  setClipboardText: (text: string) => Promise<boolean>;
 }
 
 export const IPC_CHANNELS = {
@@ -53,6 +56,8 @@ export const IPC_CHANNELS = {
   VALIDATE_CONNECTION_TOKEN: 'lantern:validate-connection-token',
   CONSUME_CONNECTION_TOKEN: 'lantern:consume-connection-token',
   CLEAR_CONNECTION_TOKEN: 'lantern:clear-connection-token',
+  GET_CLIPBOARD_TEXT: 'lantern:get-clipboard-text',
+  SET_CLIPBOARD_TEXT: 'lantern:set-clipboard-text',
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

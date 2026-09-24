@@ -16,6 +16,8 @@ export interface WebRTCEvents {
   onRemoteStream?: (stream: MediaStream) => void;
   onRemoteInputOpen?: () => void;
   onRemoteInputMessage?: (data: string) => void;
+  onClipboardOpen?: () => void;
+  onClipboardMessage?: (data: string) => void;
 }
 
 export interface SessionDescription {
@@ -25,6 +27,7 @@ export interface SessionDescription {
 
 const CONTROL_CHANNEL_LABEL = 'control';
 const REMOTE_INPUT_CHANNEL_LABEL = 'remote-input';
+const CLIPBOARD_CHANNEL_LABEL = 'clipboard';
 const DEFAULT_STUN_SERVERS = 'stun:stun.l.google.com:19302';
 
 /**
@@ -45,6 +48,7 @@ export class WebRTCService {
   private pc: RTCPeerConnection | null = null;
   private controlChannel: RTCDataChannel | null = null;
   private inputChannel: RTCDataChannel | null = null;
+  private clipboardChannel: RTCDataChannel | null = null;
   private events: WebRTCEvents = {};
 
   setEvents(events: WebRTCEvents): void {
@@ -61,8 +65,9 @@ export class WebRTCService {
 
   /** Client role: create an offer after the host accepted. Reusable for re-offers. */
   async createOffer(): Promise<SessionDescription> {
-    // Fresh connection: open `control` + `remote-input` channels. Re-offers
-    // reuse the live peer connection (and its channels) so no loop starts.
+    // Fresh connection: open `control` + `remote-input` + `clipboard`
+    // channels. Re-offers reuse the live peer connection (and its channels)
+    // so no loop starts.
     const fresh = this.pc === null;
     const pc = this.ensurePeerConnection();
     if (fresh) {
@@ -70,6 +75,8 @@ export class WebRTCService {
       this.wireControlChannel(this.controlChannel);
       this.inputChannel = pc.createDataChannel(REMOTE_INPUT_CHANNEL_LABEL);
       this.wireInputChannel(this.inputChannel);
+      this.clipboardChannel = pc.createDataChannel(CLIPBOARD_CHANNEL_LABEL);
+      this.wireClipboardChannel(this.clipboardChannel);
     }
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
@@ -155,11 +162,22 @@ export class WebRTCService {
     return sendOnChannel(this.inputChannel, data);
   }
 
+  /**
+   * Send a text frame on the `clipboard` channel (Phase 9, text-only).
+   * Same contract as control: false when the channel is not open, so
+   * callers drop instead of queueing.
+   */
+  sendClipboard(data: string): boolean {
+    return sendOnChannel(this.clipboardChannel, data);
+  }
+
   close(): void {
     closeChannel(this.controlChannel);
     closeChannel(this.inputChannel);
+    closeChannel(this.clipboardChannel);
     this.controlChannel = null;
     this.inputChannel = null;
+    this.clipboardChannel = null;
     if (this.pc) {
       this.pc.onconnectionstatechange = null;
       this.pc.oniceconnectionstatechange = null;
@@ -208,6 +226,9 @@ export class WebRTCService {
       } else if (event.channel.label === REMOTE_INPUT_CHANNEL_LABEL) {
         this.inputChannel = event.channel;
         this.wireInputChannel(event.channel);
+      } else if (event.channel.label === CLIPBOARD_CHANNEL_LABEL) {
+        this.clipboardChannel = event.channel;
+        this.wireClipboardChannel(event.channel);
       }
     };
     pc.ontrack = (event) => {
@@ -239,6 +260,18 @@ export class WebRTCService {
       // Input channel carries text frames only; binary is rejected.
       if (typeof event.data === 'string') {
         this.events.onRemoteInputMessage?.(event.data);
+      }
+    };
+  }
+
+  private wireClipboardChannel(channel: RTCDataChannel): void {
+    channel.onopen = () => {
+      this.events.onClipboardOpen?.();
+    };
+    channel.onmessage = (event) => {
+      // Clipboard channel carries text frames only; binary is rejected.
+      if (typeof event.data === 'string') {
+        this.events.onClipboardMessage?.(event.data);
       }
     };
   }

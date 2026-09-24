@@ -38,6 +38,9 @@ interface ConnectionState {
   tokenExpiresAt: number | null;
   /** Incorrect-code attempts auto-rejected without showing a modal. */
   blockedAttempts: number;
+  /** Phase 9 clipboard sync diagnostics (counts only, never contents). */
+  clipboardSent: number;
+  clipboardReceived: number;
   setRemoteId: (id: string) => void;
   setStatus: (status: ConnectionStatus) => void;
   setError: (error: string | null) => void;
@@ -57,6 +60,8 @@ interface ConnectionState {
   setTokenInput: (tokenInput: string) => void;
   setToken: (code: string | null, expiresAt: number | null) => void;
   incrementBlockedAttempts: () => void;
+  incrementClipboardSent: () => void;
+  incrementClipboardReceived: () => void;
   reset: () => void;
 }
 
@@ -68,6 +73,7 @@ interface ConnectionState {
  * Phase 4 adds local/remote MediaStreams and the sharing flag.
  * Phase 6 adds shared display size, input capability, and last-input readout.
  * Phase 8 adds connection-code fields and the blocked-attempts counter.
+ * Phase 9 adds clipboard sync counters.
  */
 export const useConnectionStore = create<ConnectionState>((set) => ({
   status: 'idle',
@@ -91,6 +97,8 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
   tokenCode: null,
   tokenExpiresAt: null,
   blockedAttempts: 0,
+  clipboardSent: 0,
+  clipboardReceived: 0,
   setRemoteId: (remoteId) => set({ remoteId }),
   setStatus: (status) => set({ status }),
   setError: (error) => set({ error }),
@@ -111,6 +119,8 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
   setTokenInput: (tokenInput) => set({ tokenInput }),
   setToken: (tokenCode, tokenExpiresAt) => set({ tokenCode, tokenExpiresAt }),
   incrementBlockedAttempts: () => set((s) => ({ blockedAttempts: s.blockedAttempts + 1 })),
+  incrementClipboardSent: () => set((s) => ({ clipboardSent: s.clipboardSent + 1 })),
+  incrementClipboardReceived: () => set((s) => ({ clipboardReceived: s.clipboardReceived + 1 })),
   reset: () =>
     set({
       status: 'idle',
@@ -131,5 +141,7 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
       tokenCode: null,
       tokenExpiresAt: null,
       blockedAttempts: 0,
+      clipboardSent: 0,
+      clipboardReceived: 0,
     }),
 }));

@@ -30,6 +30,10 @@ const lanternApi = {
     ipcRenderer.invoke(IPC_CHANNELS.CONSUME_CONNECTION_TOKEN),
   clearConnectionToken: (): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.CLEAR_CONNECTION_TOKEN),
+  getClipboardText: (): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_CLIPBOARD_TEXT),
+  setClipboardText: (text: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SET_CLIPBOARD_TEXT, text),
 };
 
 export type LanternApiType = typeof lanternApi;

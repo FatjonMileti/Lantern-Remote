@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../shared/ipc.js';
+import { ClipboardService } from '../services/ClipboardService.js';
 import { ConnectionTokenService } from '../services/ConnectionTokenService.js';
 import { DesktopSourcesService } from '../services/DesktopSourcesService.js';
 import { DeviceIdentityService } from '../services/DeviceIdentityService.js';
@@ -18,6 +19,7 @@ export function registerIpcHandlers(
   desktopSources: DesktopSourcesService,
   remoteInput: RemoteInputService,
   connectionToken: ConnectionTokenService,
+  clipboard: ClipboardService,
 ): void {
   ipcMain.handle(IPC_CHANNELS.GET_APP_INFO, () => {
     return {
@@ -86,6 +88,15 @@ export function registerIpcHandlers(
 
   ipcMain.handle(IPC_CHANNELS.CLEAR_CONNECTION_TOKEN, () => {
     connectionToken.clear();
+  });
+
+  // Clipboard: main owns validity; only lengths cross into logs, never text.
+  ipcMain.handle(IPC_CHANNELS.GET_CLIPBOARD_TEXT, () => {
+    return clipboard.readText();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.SET_CLIPBOARD_TEXT, (_event, text: unknown) => {
+    return clipboard.writeText(text);
   });
 
   logger.info('IPC handlers registered');

@@ -25,6 +25,21 @@
   Accessibility approval) when they land.
 - Clipboard sync defaults to OFF and is text-only (Phase 9).
 
+## Clipboard sync (Phase 9)
+
+- Opt-in on **both** ends independently: each side polls its local clipboard
+  only while its own setting is on _and_ the session is connected. OFF blocks
+  both directions — nothing is read locally, and inbound frames are dropped.
+- Text-only, 256 KiB cap, validated on send, on receipt, and at the main
+  write path. Oversize is rejected, never truncated. Empty reads (no text,
+  or image/rich content) are skipped — copying an image can never wipe the
+  peer's text.
+- Clipboard text crosses the already-encrypted `clipboard` DataChannel; the
+  signaling server never sees it. Contents are never logged — diagnostics
+  count sends/receives only.
+- Only changes made while sync is active propagate; enabling mid-session
+  seeds (does not send) the current clipboard, so stale text never replays.
+
 ## Identity vs. authentication
 
 - The 9-digit device ID (`482 913 742` format) is an **identifier, not a secret**.

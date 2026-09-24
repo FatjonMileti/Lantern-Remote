@@ -3,6 +3,7 @@ import { parseControlMessage } from '../../shared/controlMessages.js';
 import { formatDeviceId } from '../../shared/deviceId.js';
 import type { RemoteInputMessage } from '../../shared/remoteInput.js';
 import { NEGOTIATION_TIMEOUT_MS, SIGNALING_ERROR_MESSAGES } from '../../shared/signaling.js';
+import { clipboardService } from '../services/ClipboardService.js';
 import { remoteInputService } from '../services/RemoteInputService.js';
 import { signalingService } from '../services/SignalingService.js';
 import { webrtcService } from '../services/WebRTCService.js';
@@ -140,14 +141,19 @@ export function useSignalingSession(): {
       onRemoteStream: (stream) => {
         useConnectionStore.getState().setRemoteStream(stream);
       },
-      onRemoteInputMessage: (data) => {
-        // Host path only: the client never applies input to itself. Trust
+      onRemoteInputMessage: (data) => {        // Host path only: the client never applies input to itself. Trust
         // comes from the channel; content is validated inside forwardToHost.
         const store = useConnectionStore.getState();
         if (store.role !== 'host' || !store.sharing) return;
         const message = remoteInputService.forwardToHost(data, store.sharedDisplaySize);
         if (!message) return;
         store.setLastRemoteInput(summarizeInput(message));
+      },
+      onClipboardMessage: (data) => {
+        // Phase 9: the service validates, writes locally, and suppresses
+        // echo. It drops the frame unless sync is actively polling, so the
+        // OFF setting blocks both directions.
+        void clipboardService.handleRemoteMessage(data);
       },
       onControlMessage: (data) => {
         // Trust comes from the channel itself (only the peer holds it);

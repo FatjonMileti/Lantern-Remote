@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron';
 import started from 'electron-squirrel-startup';
 import { registerIpcHandlers } from './main/ipc.js';
 import { createMainWindow } from './main/window.js';
+import { ClipboardService } from './services/ClipboardService.js';
 import { ConnectionTokenService } from './services/ConnectionTokenService.js';
 import { DesktopSourcesService } from './services/DesktopSourcesService.js';
 import { DeviceIdentityService } from './services/DeviceIdentityService.js';
@@ -24,8 +25,9 @@ const deviceIdentity = new DeviceIdentityService();
 const desktopSources = new DesktopSourcesService();
 const remoteInput = new RemoteInputService();
 const connectionToken = new ConnectionTokenService();
+const clipboard = new ClipboardService();
 
-registerIpcHandlers(deviceIdentity, desktopSources, remoteInput, connectionToken);
+registerIpcHandlers(deviceIdentity, desktopSources, remoteInput, connectionToken, clipboard);
 
 const allowMultiInstance =
   process.env.LANTERN_ALLOW_MULTI_INSTANCE === '1' || Boolean(customUserData);

@@ -313,6 +313,11 @@ select {
   white-space: nowrap;
 }
 
+.stub-active {
+  color: var(--accent);
+  opacity: 1;
+}
+
 .tool-button {
   padding: 0.35rem 0.7rem;
   border-radius: 6px;

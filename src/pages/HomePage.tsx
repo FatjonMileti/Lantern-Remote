@@ -7,6 +7,7 @@ import { RecentConnections } from '../components/RecentConnections.js';
 import { RemoteDesktopViewer } from '../components/RemoteDesktopViewer.js';
 import { ScreenShareControls } from '../components/ScreenShareControls.js';
 import { SettingsPanel } from '../components/SettingsPanel.js';
+import { useClipboardSync } from '../hooks/useClipboardSync.js';
 import { useConnectionToken } from '../hooks/useConnectionToken.js';
 import { useScreenShare } from '../hooks/useScreenShare.js';
 import { useSignalingSession } from '../hooks/useSignalingSession.js';
@@ -47,6 +48,7 @@ export function HomePage() {
     regenerate: regenerateToken,
     revoke: revokeToken,
   } = useConnectionToken();
+  const clipboardActive = useClipboardSync();
 
   return (
     <main className="layout">
@@ -95,10 +97,10 @@ export function HomePage() {
           onFullscreenChange={setFullscreen}
         />
         <RecentConnections />
-        <SettingsPanel />
+        <SettingsPanel clipboardActive={clipboardActive} />
       </div>
       <footer className="footer">
-        <span>Phase 8 — connection codes required. Clipboard sync arrives in Phase 9.</span>
+        <span>Phase 9 — text clipboard sync is opt-in (Settings, off by default).</span>
       </footer>
       {incoming && (
         <IncomingRequestModal

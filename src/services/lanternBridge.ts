@@ -55,3 +55,11 @@ export function consumeConnectionToken(): Promise<boolean> {
 export function clearConnectionToken(): Promise<void> {
   return bridge().clearConnectionToken();
 }
+
+export function getClipboardText(): Promise<string> {
+  return bridge().getClipboardText();
+}
+
+export function setClipboardText(text: string): Promise<boolean> {
+  return bridge().setClipboardText(text);
+}

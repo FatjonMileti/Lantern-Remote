@@ -227,7 +227,7 @@ no stuck keys.
 
 ---
 
-## Phase 8 — Connection approval + temporary tokens — DONE (uncommitted)
+## Phase 8 — Connection approval + temporary tokens — DONE
 
 **Goal:** device ID + expiring token + host approval required for every session.
 
@@ -254,20 +254,36 @@ types ID + wrong code → blocked count rises, no modal; right code → modal �
 Accept → code burned (Generate needed for next session); wait 10 min →
 expired rejects.
 
-**Commit:** `feat: add connection authentication` (pending)
+**Commit:** `feat: add connection authentication`
 
 ---
 
-## Phase 9 — Clipboard synchronization (text-only, opt-in)
+## Phase 9 — Clipboard synchronization (text-only, opt-in) — DONE
 
 **Goal:** optional bidirectional text clipboard over `clipboard` DataChannel.
 
-- [ ] Setting `Enable clipboard synchronization`, default **false**.
-- [ ] Text-only both directions; validate + size-limit messages.
-- [ ] Never log clipboard contents.
+- [x] Setting `Enable clipboard synchronization`, default **false**
+      (`settingsStore`, pre-existing skeleton now live).
+- [x] `shared/clipboard.ts`: `clipboard-text` frames, 256 KiB cap, empty
+      rejected (image copies can't wipe the peer), oversize rejected.
+- [x] `clipboard` DataChannel on the same peer connection (offerer creates,
+      answerer routes by label, text frames only, same drop-if-closed
+      contract as control/input).
+- [x] Main `ClipboardService` (Electron 44 async clipboard) + 2 IPC channels;
+      reads truncated to MAX+1, writes re-validated, lengths-only logging.
+- [x] Renderer `ClipboardService`: 1s poll while connected + enabled, seed
+      baseline on start (no replay), echo suppression, per-session counters.
+- [x] UI: Settings shows live state + sent/received counts; toolbar Clipboard
+      entry reflects real sync state instead of a stub.
+- [x] Model documented in `SECURITY.md`.
 
-**Verify:** with setting ON, copy on client pastes on host and vice versa;
-with OFF, nothing syncs.
+**Verify:** `typecheck` ✅, `lint` ✅, Prettier ✅, protocol checks 7/7 ✅,
+echo/suppression checks 9/9 ✅ (seed silence, send-once, no-resend, apply,
+no-echo, malformed/oversize/duplicate ignored, stopped inert), oversize
+local 1/1 ✅, boot clean ✅.
+NOT verified headless: real OS clipboards host↔client — manual run with two
+instances: setting ON both, copy on client → paste on host and vice versa;
+setting OFF either side → nothing syncs; copy image → peer text untouched.
 
 **Commit:** `feat: add clipboard synchronization`
 

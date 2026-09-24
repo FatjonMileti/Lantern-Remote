@@ -5,9 +5,10 @@ A portfolio-quality project demonstrating real-time communication, desktop captu
 and secure Electron architecture. Inspired by the _architecture_ of tools like
 AnyDesk/TeamViewer — no branding, proprietary UI, or code is copied.
 
-> **Phase 8 status:** connection codes required — 6-character single-use
-> expiring codes validated by the host before any modal, wrong codes
-> auto-rejected and counted. Clipboard sync (Phase 9) is not yet implemented.
+> **Phase 9 status:** opt-in text clipboard sync is live — enable it in
+> Settings (off by default), copy on either side while connected and the
+> text appears on the peer. Images/rich content never sync (read as empty,
+> skipped). File transfer (Phase 11) is not yet implemented.
 
 ## Architecture
 
@@ -111,11 +112,15 @@ See `SECURITY.md`. Key points:
 - WebRTC media/DataChannels are encrypted; signaling carries no video.
 - Device ID is persisted under `app.getPath('userData')`, never a MAC address.
 
-## Known limitations (Phase 8)
+## Known limitations (Phase 9)
 
 - Codes travel opaquely through the signaling server (shape-checked only),
   so a compromised server could harvest a live code — bounded by 10-minute
   expiry + single-use burn. Production needs authenticated registration.
+- Text clipboard only (256 KiB cap, rejected not truncated); image or rich
+  clipboard content reads as empty and is skipped, so copying an image never
+  wipes the peer's text. Only changes made while connected _and_ enabled
+  propagate — pre-existing differences do not.
 - Linux/X11 host input works via xdotool (mouse + keyboard); macOS via
   cliclick (mouse: move/left/right-click; keyboard: modifiers + listed
   special keys). Wayland needs ydotool (planned); Windows is stubbed.
@@ -127,5 +132,4 @@ See `SECURITY.md`. Key points:
 
 ## Roadmap
 
-Phases 9–12 per spec: clipboard →
-keyboard → auth tokens → clipboard → settings/logging → tests → polish.
+Phases 10–12 per spec: settings/logging → tests → polish.

@@ -1,3 +1,6 @@
+import { useConnectionStore } from '../stores/connectionStore.js';
+import { useSettingsStore } from '../stores/settingsStore.js';
+
 export type ViewerScaleMode = 'fit' | 'actual';
 
 interface ConnectionToolbarProps {
@@ -11,8 +14,9 @@ interface ConnectionToolbarProps {
 
 /**
  * Session toolbar: scaling, fullscreen, disconnect. Quality / monitor /
- * clipboard / file-transfer entries are visible stubs for later phases —
- * present but inert, never pretending to work.
+ * file-transfer entries are visible stubs for later phases — present but
+ * inert, never pretending to work. The clipboard entry is live since
+ * Phase 9: it reflects the real sync state (setting + connected).
  */
 export function ConnectionToolbar({
   scaleMode = 'fit',
@@ -22,6 +26,9 @@ export function ConnectionToolbar({
   onDisconnect,
   disabled = false,
 }: ConnectionToolbarProps) {
+  const clipboardSync = useSettingsStore((s) => s.clipboardSync);
+  const connected = useConnectionStore((s) => s.status) === 'connected';
+  const clipboardActive = clipboardSync && connected;
   return (
     <div className="toolbar" role="toolbar" aria-label="Connection controls">
       <div className="toolbar-group">
@@ -74,8 +81,15 @@ export function ConnectionToolbar({
         <span className="stub" title="Monitor selection (later phase)">
           Monitor
         </span>
-        <span className="stub" title="Clipboard sync (Phase 9)">
-          Clipboard
+        <span
+          className={clipboardActive ? 'stub stub-active' : 'stub'}
+          title={
+            clipboardActive
+              ? 'Clipboard sync is ON — text syncs both ways'
+              : 'Clipboard sync is OFF — enable it in Settings'
+          }
+        >
+          Clipboard{clipboardActive ? ' •' : ''}
         </span>
         <span className="stub" title="File transfer (future)">
           Files
